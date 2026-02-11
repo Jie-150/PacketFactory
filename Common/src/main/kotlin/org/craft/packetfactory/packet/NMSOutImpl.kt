@@ -894,7 +894,7 @@ internal class NMSOutImpl : NMSOut {
     }
 
     override fun createRespawn(data: PacketData): Any {
-        val world: org.bukkit.World = data.read<org.bukkit.World>("world")
+        val world = data.read<org.bukkit.World>("world")
         val type = when (world.environment.name) {
             "THE_END" -> World.THE_END
             "THE_NETHER" -> World.THE_NETHER
