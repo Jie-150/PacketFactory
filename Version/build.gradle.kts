@@ -3,5 +3,5 @@ taboolib {
 }
 
 gradle.buildFinished {
-    buildDir.deleteRecursively()
+    layout.buildDirectory.get().asFile.deleteRecursively()
 }

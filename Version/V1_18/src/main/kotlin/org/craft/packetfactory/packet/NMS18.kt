@@ -17,8 +17,11 @@ import net.minecraft.world.level.block.state.IBlockData
 import net.minecraft.world.phys.Vec3D
 import org.bukkit.Location
 import org.bukkit.Material
-import org.bukkit.craftbukkit.v1_16_R3.inventory.CraftItemStack
+import org.bukkit.Particle
+import org.bukkit.craftbukkit.v1_18_R2.CraftParticle
+import org.bukkit.craftbukkit.v1_18_R2.inventory.CraftItemStack
 import org.bukkit.entity.EntityType
+import org.bukkit.util.Vector
 import taboolib.library.reflex.Reflex.Companion.setProperty
 import taboolib.library.reflex.Reflex.Companion.unsafeInstance
 import taboolib.module.nms.remap.require
@@ -34,7 +37,18 @@ internal class NMS18 : NMSOut {
         val location = data.read<Location>("location")
         val extraData = data.readOrElse("data", 0)
         val type = IRegistry.ENTITY_TYPE.get(MinecraftKey(entityType.name.lowercase()))
-        return PacketPlayOutSpawnEntity(entityId, uuid, location.x, location.y, location.z, location.yaw, location.pitch, type, extraData, Vec3D.ZERO)
+        return PacketPlayOutSpawnEntity(
+            entityId,
+            uuid,
+            location.x,
+            location.y,
+            location.z,
+            location.yaw,
+            location.pitch,
+            type,
+            extraData,
+            Vec3D.ZERO
+        )
     }
 
     override fun createSpawnEntityLiving(data: PacketData): Any {
@@ -655,7 +669,8 @@ internal class NMS18 : NMSOut {
         data.readOrNull<List<org.bukkit.inventory.ItemStack>>("items")?.forEach { i ->
             items.add(toNMSItem(i) as ItemStack)
         }
-        val carriedItem = toNMSItem(data.readOrElse("emptyItemStack", org.bukkit.inventory.ItemStack(Material.AIR))) as ItemStack
+        val carriedItem =
+            toNMSItem(data.readOrElse("emptyItemStack", org.bukkit.inventory.ItemStack(Material.AIR))) as ItemStack
         return PacketPlayOutWindowItems(containerId, stateId, items, carriedItem)
     }
 
@@ -668,7 +683,25 @@ internal class NMS18 : NMSOut {
     }
 
     override fun createWorldParticles(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val type = CraftParticle.toNMS(data.read<Particle>("type"))
+        val overrideLimiter = data.readOrElse("overrideLimiter", false)
+        val location = data.read<Location>("location")
+        val vector = data.readOrElse("vector", Vector())
+        val maxSpeed = data.readOrElse("maxSpeed", 1.0f)
+        val count = data.readOrElse("count", 1)
+
+        return PacketPlayOutWorldParticles(
+            type,
+            overrideLimiter,
+            location.x,
+            location.y,
+            location.z,
+            vector.x.toFloat(),
+            vector.y.toFloat(),
+            vector.z.toFloat(),
+            maxSpeed,
+            count
+        )
     }
 
     override fun createNamedEntitySpawn(data: PacketData): Any {
@@ -676,21 +709,27 @@ internal class NMS18 : NMSOut {
         val uuid = data.read<UUID>("uuid")
         val location = data.read<Location>("location")
 
-            return PacketPlayOutNamedEntitySpawn::class.java.unsafeInstance().also {
-                it.setProperty("entityId", entityId)
-                it.setProperty("uuid", uuid)
-                it.setProperty("x", location.x)
-                it.setProperty("y", location.y)
-                it.setProperty("z", location.z)
-                it.setProperty("yaw", mathRot(location.yaw))
-                it.setProperty("pitch", mathRot(location.pitch))
-            }
+        return PacketPlayOutNamedEntitySpawn::class.java.unsafeInstance().also {
+            it.setProperty("entityId", entityId)
+            it.setProperty("uuid", uuid)
+            it.setProperty("x", location.x)
+            it.setProperty("y", location.y)
+            it.setProperty("z", location.z)
+            it.setProperty("yaw", mathRot(location.yaw))
+            it.setProperty("pitch", mathRot(location.pitch))
+        }
     }
 
     override fun createSpawnEntityPainting(data: PacketData): Any {
         val location = data.read<Location>("location")
         val direction = data.read<String>("direction")
-        return PacketPlayOutSpawnEntityPainting(EntityPainting(null, location.toPosition(), EnumDirection.byName(direction)))
+        return PacketPlayOutSpawnEntityPainting(
+            EntityPainting(
+                null,
+                location.toPosition(),
+                EnumDirection.byName(direction)
+            )
+        )
     }
 
     private fun toNMSItem(itemStack: org.bukkit.inventory.ItemStack): Any {
@@ -729,14 +768,20 @@ internal class NMS18 : NMSOut {
                 value as Optional<IChatBaseComponent>
             )
 
-            is IBlockData -> DataWatcher.Item(DataWatcher.defineId(Entity::class.java, DataWatcherRegistry.BLOCK_STATE), value as Optional<IBlockData>)
+            is IBlockData -> DataWatcher.Item(
+                DataWatcher.defineId(Entity::class.java, DataWatcherRegistry.BLOCK_STATE),
+                value as Optional<IBlockData>
+            )
 
             is BlockPosition -> DataWatcher.Item(
                 DataWatcher.defineId(Entity::class.java, DataWatcherRegistry.OPTIONAL_BLOCK_POS),
                 value as Optional<BlockPosition>
             )
 
-            is UUID -> DataWatcher.Item(DataWatcher.defineId(Entity::class.java, DataWatcherRegistry.OPTIONAL_UUID), value as Optional<UUID>)
+            is UUID -> DataWatcher.Item(
+                DataWatcher.defineId(Entity::class.java, DataWatcherRegistry.OPTIONAL_UUID),
+                value as Optional<UUID>
+            )
 
             else -> error("不支持的类型: $value")
         }
@@ -775,7 +820,10 @@ internal class NMS18 : NMSOut {
     }
 
     fun getDataWatcher(value: OptionalInt): DataWatcher.Item<OptionalInt> {
-        return DataWatcher.Item(DataWatcher.defineId(Entity::class.java, DataWatcherRegistry.OPTIONAL_UNSIGNED_INT), value)
+        return DataWatcher.Item(
+            DataWatcher.defineId(Entity::class.java, DataWatcherRegistry.OPTIONAL_UNSIGNED_INT),
+            value
+        )
     }
 
     fun getDataWatcher(value: EntityPose): DataWatcher.Item<EntityPose> {

@@ -16,8 +16,11 @@ import net.minecraft.world.level.block.state.IBlockData
 import net.minecraft.world.phys.Vec3D
 import org.bukkit.Location
 import org.bukkit.Material
-import org.bukkit.craftbukkit.v1_16_R3.inventory.CraftItemStack
+import org.bukkit.Particle
+import org.bukkit.craftbukkit.v1_17_R1.CraftParticle
+import org.bukkit.craftbukkit.v1_17_R1.inventory.CraftItemStack
 import org.bukkit.entity.EntityType
+import org.bukkit.util.Vector
 import taboolib.library.reflex.Reflex.Companion.setProperty
 import taboolib.library.reflex.Reflex.Companion.unsafeInstance
 import taboolib.module.nms.remap.require
@@ -667,8 +670,10 @@ internal class NMS17 : NMSOut {
         val containerId = data.read<Int>("containerId")
         val stateId = data.read<Int>("stateId")
         val items = NonNullList.a<ItemStack>()
-        data.readOrNull<List<org.bukkit.inventory.ItemStack>>("items")?.forEach { i -> items.add(toNMSItem(i) as ItemStack) }
-        val carriedItem = toNMSItem(data.readOrElse("emptyItemStack", org.bukkit.inventory.ItemStack(Material.AIR))) as ItemStack
+        data.readOrNull<List<org.bukkit.inventory.ItemStack>>("items")
+            ?.forEach { i -> items.add(toNMSItem(i) as ItemStack) }
+        val carriedItem =
+            toNMSItem(data.readOrElse("emptyItemStack", org.bukkit.inventory.ItemStack(Material.AIR))) as ItemStack
         return PacketPlayOutWindowItems(containerId, stateId, items, carriedItem)
     }
 
@@ -681,7 +686,25 @@ internal class NMS17 : NMSOut {
     }
 
     override fun createWorldParticles(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val type = CraftParticle.toNMS(data.read<Particle>("type"))
+        val overrideLimiter = data.readOrElse("overrideLimiter", false)
+        val location = data.read<Location>("location")
+        val vector = data.readOrElse("vector", Vector())
+        val maxSpeed = data.readOrElse("maxSpeed", 1.0f)
+        val count = data.readOrElse("count", 1)
+
+        return PacketPlayOutWorldParticles(
+            type,
+            overrideLimiter,
+            location.x,
+            location.y,
+            location.z,
+            vector.x.toFloat(),
+            vector.y.toFloat(),
+            vector.z.toFloat(),
+            maxSpeed,
+            count
+        )
     }
 
     override fun createNamedEntitySpawn(data: PacketData): Any {
@@ -735,13 +758,29 @@ internal class NMS17 : NMSOut {
     @Suppress("UNCHECKED_CAST")
     fun getOptionalDataWatcher(value: Optional<*>): DataWatcher.Item<out Optional<*>> {
         return when (value.getOrNull()) {
-            is IChatBaseComponent -> DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.OPTIONAL_COMPONENT), value as Optional<IChatBaseComponent>)
+            is IChatBaseComponent -> DataWatcher.Item(
+                DataWatcher.a(
+                    Entity::class.java,
+                    DataWatcherRegistry.OPTIONAL_COMPONENT
+                ), value as Optional<IChatBaseComponent>
+            )
 
-            is IBlockData -> DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.BLOCK_STATE), value as Optional<IBlockData>)
+            is IBlockData -> DataWatcher.Item(
+                DataWatcher.a(Entity::class.java, DataWatcherRegistry.BLOCK_STATE),
+                value as Optional<IBlockData>
+            )
 
-            is BlockPosition -> DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.OPTIONAL_BLOCK_POS), value as Optional<BlockPosition>)
+            is BlockPosition -> DataWatcher.Item(
+                DataWatcher.a(
+                    Entity::class.java,
+                    DataWatcherRegistry.OPTIONAL_BLOCK_POS
+                ), value as Optional<BlockPosition>
+            )
 
-            is UUID -> DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.OPTIONAL_UUID), value as Optional<UUID>)
+            is UUID -> DataWatcher.Item(
+                DataWatcher.a(Entity::class.java, DataWatcherRegistry.OPTIONAL_UUID),
+                value as Optional<UUID>
+            )
 
             else -> error("不支持的类型: $value")
         }
