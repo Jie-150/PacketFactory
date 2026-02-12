@@ -16,8 +16,11 @@ import net.minecraft.world.level.block.state.IBlockData
 import net.minecraft.world.phys.Vec3D
 import org.bukkit.Location
 import org.bukkit.Material
+import org.bukkit.Particle
 import org.bukkit.craftbukkit.v1_16_R3.inventory.CraftItemStack
+import org.bukkit.craftbukkit.v1_17_R1.CraftParticle
 import org.bukkit.entity.EntityType
+import org.bukkit.util.Vector
 import taboolib.library.reflex.Reflex.Companion.setProperty
 import taboolib.library.reflex.Reflex.Companion.unsafeInstance
 import taboolib.module.nms.remap.require
@@ -83,43 +86,43 @@ internal class NMS17 : NMSOut {
     }
 
     override fun createTeleportPosition(data: PacketData): Any {
-        TODO("Not yet implemented")
+        TODO("PacketPlayOutEntityTeleport: 实体传送位置数据包")
     }
 
     override fun createEntityHeadRotation(data: PacketData): Any {
-        TODO("Not yet implemented")
+        TODO("PacketPlayOutEntityHeadRotation: 实体头部旋转数据包")
     }
 
     override fun createEntityMetadata(data: PacketData): Any {
-        TODO("Not yet implemented")
+        TODO("PacketPlayOutEntityMetadata: 实体元数据更新数据包")
     }
 
     override fun createEntityDestroy(data: PacketData): Any {
-        TODO("Not yet implemented")
+        TODO("PacketPlayOutEntityDestroy: 实体销毁数据包")
     }
 
     override fun createRelEntityMove(data: PacketData): Any {
-        TODO("Not yet implemented")
+        TODO("PacketPlayOutRelEntityMove: 实体相对移动数据包")
     }
 
     override fun createEntityLook(data: PacketData): Any {
-        TODO("Not yet implemented")
+        TODO("PacketPlayOutEntityLook: 实体朝向数据包")
     }
 
     override fun createRelEntityMoveLook(data: PacketData): Any {
-        TODO("Not yet implemented")
+        TODO("PacketPlayOutRelEntityMoveLook: 实体移动和朝向数据包")
     }
 
     override fun createEntityEquipment(data: PacketData): Any {
-        TODO("Not yet implemented")
+        TODO("PacketPlayOutEntityEquipment: 实体装备数据包")
     }
 
     override fun createAnimation(data: PacketData): Any {
-        TODO("Not yet implemented")
+        TODO("PacketPlayOutAnimation: 实体动画数据包")
     }
 
     override fun createAttachEntity(data: PacketData): Any {
-        TODO("Not yet implemented")
+        TODO("PacketPlayOutAttachEntity: 实体附着数据包")
     }
 
     override fun createEntityVelocity(data: PacketData): Any {
@@ -203,43 +206,43 @@ internal class NMS17 : NMSOut {
     }
 
     override fun createResetChat(data: PacketData): Any {
-        TODO("Not yet implemented")
+        TODO("PacketPlayOutResetChat: 重置聊天数据包")
     }
 
     override fun createSelectKnown(data: PacketData): Any {
-        TODO("Not yet implemented")
+        TODO("PacketPlayOutSelectKnown: 选择已知数据包")
     }
 
     override fun createUpdateEnabledFeatures(data: PacketData): Any {
-        TODO("Not yet implemented")
+        TODO("PacketPlayOutUpdateEnabledFeatures: 更新启用功能数据包")
     }
 
     override fun createAcceptCodeOfConduct(data: PacketData): Any {
-        TODO("Not yet implemented")
+        TODO("PacketPlayOutAcceptCodeOfConduct: 接受行为准则数据包")
     }
 
     override fun createCookieRequest(data: PacketData): Any {
-        TODO("Not yet implemented")
+        TODO("PacketPlayOutCookieRequest: Cookie请求数据包")
     }
 
     override fun createCookieResponse(data: PacketData): Any {
-        TODO("Not yet implemented")
+        TODO("PacketPlayOutCookieResponse: Cookie响应数据包")
     }
 
     override fun createBlockChangedAck(data: PacketData): Any {
-        TODO("Not yet implemented")
+        TODO("PacketPlayOutBlockChangedAck: 方块变更确认数据包")
     }
 
     override fun createBundleDelimiter(data: PacketData): Any {
-        TODO("Not yet implemented")
+        TODO("PacketPlayOutBundleDelimiter: 数据包束分隔符数据包")
     }
 
     override fun createChunkBatchFinished(data: PacketData): Any {
-        TODO("Not yet implemented")
+        TODO("PacketPlayOutChunkBatchFinished: 区块批次完成数据包")
     }
 
     override fun createChunkBatchStart(data: PacketData): Any {
-        TODO("Not yet implemented")
+        TODO("PacketPlayOutChunkBatchStart: 区块批次开始数据包")
     }
 
     override fun createChunksBiomes(data: PacketData): Any {
@@ -363,43 +366,43 @@ internal class NMS17 : NMSOut {
     }
 
     override fun createSetActionBarText(data: PacketData): Any {
-        TODO("Not yet implemented")
+        TODO("PacketPlayOutSetActionBarText: 设置操作栏文本数据包")
     }
 
     override fun createSetBorderCenter(data: PacketData): Any {
-        TODO("Not yet implemented")
+        TODO("PacketPlayOutSetBorderCenter: 设置边界中心数据包")
     }
 
     override fun createSetBorderLerpSize(data: PacketData): Any {
-        TODO("Not yet implemented")
+        TODO("PacketPlayOutSetBorderLerpSize: 设置边界渐变大小数据包")
     }
 
     override fun createSetBorderSize(data: PacketData): Any {
-        TODO("Not yet implemented")
+        TODO("PacketPlayOutSetBorderSize: 设置边界大小数据包")
     }
 
     override fun createSetBorderWarningDelay(data: PacketData): Any {
-        TODO("Not yet implemented")
+        TODO("PacketPlayOutSetBorderWarningDelay: 设置边界警告延迟数据包")
     }
 
     override fun createSetBorderWarningDistance(data: PacketData): Any {
-        TODO("Not yet implemented")
+        TODO("PacketPlayOutSetBorderWarningDistance: 设置边界警告距离数据包")
     }
 
     override fun createSetCursorItem(data: PacketData): Any {
-        TODO("Not yet implemented")
+        TODO("PacketPlayOutSetCursorItem: 设置光标物品数据包")
     }
 
     override fun createSetPlayerInventory(data: PacketData): Any {
-        TODO("Not yet implemented")
+        TODO("PacketPlayOutSetPlayerInventory: 设置玩家物品栏数据包")
     }
 
     override fun createSetSimulationDistance(data: PacketData): Any {
-        TODO("Not yet implemented")
+        TODO("PacketPlayOutSetSimulationDistance: 设置模拟距离数据包")
     }
 
     override fun createSetSubtitleText(data: PacketData): Any {
-        TODO("Not yet implemented")
+        TODO("PacketPlayOutSetSubtitleText: 设置副标题文本数据包")
     }
 
     override fun createSetTitlesAnimation(data: PacketData): Any {
@@ -443,43 +446,43 @@ internal class NMS17 : NMSOut {
     }
 
     override fun createAutoRecipe(data: PacketData): Any {
-        TODO("Not yet implemented")
+        TODO("PacketPlayOutAutoRecipe: 自动配方数据包")
     }
 
     override fun createBlockAction(data: PacketData): Any {
-        TODO("Not yet implemented")
+        TODO("PacketPlayOutBlockAction: 方块动作数据包")
     }
 
     override fun createBlockBreakAnimation(data: PacketData): Any {
-        TODO("Not yet implemented")
+        TODO("PacketPlayOutBlockBreakAnimation: 方块破坏动画数据包")
     }
 
     override fun createBlockChange(data: PacketData): Any {
-        TODO("Not yet implemented")
+        TODO("PacketPlayOutBlockChange: 方块变更数据包")
     }
 
     override fun createBossBar(data: PacketData): Any {
-        TODO("Not yet implemented")
+        TODO("PacketPlayOutBossBar: Boss血条数据包")
     }
 
     override fun createCamera(data: PacketData): Any {
-        TODO("Not yet implemented")
+        TODO("PacketPlayOutCamera: 摄像机数据包")
     }
 
     override fun createCloseWindow(data: PacketData): Any {
-        TODO("Not yet implemented")
+        TODO("PacketPlayOutCloseWindow: 关闭窗口数据包")
     }
 
     override fun createCollect(data: PacketData): Any {
-        TODO("Not yet implemented")
+        TODO("PacketPlayOutCollect: 收集物品数据包")
     }
 
     override fun createCommands(data: PacketData): Any {
-        TODO("Not yet implemented")
+        TODO("PacketPlayOutCommands: 命令数据包")
     }
 
     override fun createEntityEffect(data: PacketData): Any {
-        TODO("Not yet implemented")
+        TODO("PacketPlayOutEntityEffect: 实体效果数据包")
     }
 
     override fun createEntitySound(data: PacketData): Any {
@@ -643,7 +646,14 @@ internal class NMS17 : NMSOut {
     }
 
     override fun createVehicleMove(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val location = data.read<Location>("location")
+        return PacketPlayOutVehicleMove::class.java.unsafeInstance().also {
+            it.setProperty("x", location.x)
+            it.setProperty("y", location.y)
+            it.setProperty("z", location.z)
+            it.setProperty("yRot", location.yaw)
+            it.setProperty("xRot", location.pitch)
+        }
     }
 
     override fun createViewCentre(data: PacketData): Any {
@@ -653,7 +663,8 @@ internal class NMS17 : NMSOut {
     }
 
     override fun createViewDistance(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val radius = data.read<Int>("radius");
+        return PacketPlayOutViewDistance(radius)
     }
 
     override fun createWindowData(data: PacketData): Any {
@@ -667,8 +678,10 @@ internal class NMS17 : NMSOut {
         val containerId = data.read<Int>("containerId")
         val stateId = data.read<Int>("stateId")
         val items = NonNullList.a<ItemStack>()
-        data.readOrNull<List<org.bukkit.inventory.ItemStack>>("items")?.forEach { i -> items.add(toNMSItem(i) as ItemStack) }
-        val carriedItem = toNMSItem(data.readOrElse("emptyItemStack", org.bukkit.inventory.ItemStack(Material.AIR))) as ItemStack
+        data.readOrNull<List<org.bukkit.inventory.ItemStack>>("items")
+            ?.forEach { i -> items.add(toNMSItem(i) as ItemStack) }
+        val carriedItem =
+            toNMSItem(data.readOrElse("emptyItemStack", org.bukkit.inventory.ItemStack(Material.AIR))) as ItemStack
         return PacketPlayOutWindowItems(containerId, stateId, items, carriedItem)
     }
 
@@ -681,7 +694,25 @@ internal class NMS17 : NMSOut {
     }
 
     override fun createWorldParticles(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val type = CraftParticle.toNMS(data.read<Particle>("type"))
+        val overrideLimiter = data.readOrElse("overrideLimiter", false)
+        val location = data.read<Location>("location")
+        val vector = data.readOrElse("vector", Vector())
+        val maxSpeed = data.readOrElse("maxSpeed", 1.0f)
+        val count = data.readOrElse("count", 1)
+
+        return PacketPlayOutWorldParticles(
+            type,
+            overrideLimiter,
+            location.x,
+            location.y,
+            location.z,
+            vector.x.toFloat(),
+            vector.y.toFloat(),
+            vector.z.toFloat(),
+            maxSpeed,
+            count
+        )
     }
 
     override fun createNamedEntitySpawn(data: PacketData): Any {
@@ -701,7 +732,19 @@ internal class NMS17 : NMSOut {
     }
 
     override fun createSpawnEntityPainting(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val id = data.read<Int>("id")
+        val uuid = data.read<UUID>("uuid")
+        val location = data.read<Location>("location")
+        val direction = data.readEnumOrElse(EnumDirection::class.java, "direction", EnumDirection.NORTH)
+        val motive = data.readOrElse("motive", 0)
+
+        return PacketPlayOutSpawnEntityPainting::class.java.unsafeInstance().also {
+            it.setProperty("id", id)
+            it.setProperty("uuid", uuid)
+            it.setProperty("pos", location.toPosition())
+            it.setProperty("direction", direction)
+            it.setProperty("motive", motive)
+        }
     }
 
     private fun toNMSItem(itemStack: org.bukkit.inventory.ItemStack): Any {
@@ -735,13 +778,29 @@ internal class NMS17 : NMSOut {
     @Suppress("UNCHECKED_CAST")
     fun getOptionalDataWatcher(value: Optional<*>): DataWatcher.Item<out Optional<*>> {
         return when (value.getOrNull()) {
-            is IChatBaseComponent -> DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.OPTIONAL_COMPONENT), value as Optional<IChatBaseComponent>)
+            is IChatBaseComponent -> DataWatcher.Item(
+                DataWatcher.a(
+                    Entity::class.java,
+                    DataWatcherRegistry.OPTIONAL_COMPONENT
+                ), value as Optional<IChatBaseComponent>
+            )
 
-            is IBlockData -> DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.BLOCK_STATE), value as Optional<IBlockData>)
+            is IBlockData -> DataWatcher.Item(
+                DataWatcher.a(Entity::class.java, DataWatcherRegistry.BLOCK_STATE),
+                value as Optional<IBlockData>
+            )
 
-            is BlockPosition -> DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.OPTIONAL_BLOCK_POS), value as Optional<BlockPosition>)
+            is BlockPosition -> DataWatcher.Item(
+                DataWatcher.a(
+                    Entity::class.java,
+                    DataWatcherRegistry.OPTIONAL_BLOCK_POS
+                ), value as Optional<BlockPosition>
+            )
 
-            is UUID -> DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.OPTIONAL_UUID), value as Optional<UUID>)
+            is UUID -> DataWatcher.Item(
+                DataWatcher.a(Entity::class.java, DataWatcherRegistry.OPTIONAL_UUID),
+                value as Optional<UUID>
+            )
 
             else -> error("不支持的类型: $value")
         }

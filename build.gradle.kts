@@ -1,21 +1,5 @@
-import io.izzel.taboolib.gradle.Basic
-import io.izzel.taboolib.gradle.Bukkit
-import io.izzel.taboolib.gradle.BukkitHook
-import io.izzel.taboolib.gradle.BukkitNMSDataSerializer
 import io.izzel.taboolib.gradle.BukkitNMSUtil
-import io.izzel.taboolib.gradle.BukkitNavigation
-import io.izzel.taboolib.gradle.BukkitUI
-import io.izzel.taboolib.gradle.BukkitUtil
-import io.izzel.taboolib.gradle.CommandHelper
-import io.izzel.taboolib.gradle.Database
-import io.izzel.taboolib.gradle.Kether
-import io.izzel.taboolib.gradle.Metrics
-import io.izzel.taboolib.gradle.MinecraftChat
-import io.izzel.taboolib.gradle.MinecraftEffect
 import io.izzel.taboolib.gradle.TabooLibExtension
-import io.izzel.taboolib.gradle.XSeries
-import org.gradle.kotlin.dsl.configure
-import org.gradle.kotlin.dsl.withType
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
@@ -52,17 +36,17 @@ subprojects {
         options.encoding = "UTF-8"
     }
     tasks.withType<KotlinCompile> {
-        kotlinOptions {
-            jvmTarget = "1.8"
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_1_8)
             freeCompilerArgs = listOf("-Xjvm-default=all", "-Xextended-compiler-checks")
         }
     }
-    configure<JavaPluginConvention> {
+    configure<JavaPluginExtension> {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
     }
 }
 
 gradle.buildFinished {
-    buildDir.deleteRecursively()
+    layout.buildDirectory.get().asFile.deleteRecursively()
 }
