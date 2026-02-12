@@ -1,6 +1,6 @@
 # PacketFactory
 
-PacketFactory 是一个 Minecraft 服务器数据包工厂库，提供跨版本的统一 API 来创建各种 NMS 网络数据包。
+PacketFactory 是一个 Minecraft 服务器数据包封装库，提供跨版本的统一 API 来创建各种 NMS 网络数据包。
 
 ## 功能特性
 
@@ -70,19 +70,8 @@ val packet = api.createSpawnEntity(data)
 | `NMSOut` | 核心接口，定义所有数据包创建方法 |
 | `PacketData` | 数据容器，用于传递数据包参数 |
 
-## 版本对应
-
-| 服务器版本 | 实现类 |
-|---|---|
-| 1.17 | NMS17 |
-| 1.18 | NMS18 |
-| 1.19 | NMS19 |
-| 1.20 | NMS20 |
-| 1.21 | NMS21 |
-| 1.16 及更早 | NMSOutImpl |
-
 ## 注意事项
 
-- 库只负责创建数据包对象，发送需配合 TabooLib 或 ProtocolLib
+- 库只负责创建数据包对象，发送需配合 TabooLib 或自己获取CraftPlayer的sendPacket方法
 - 使用前确保 PacketData 包含所有必需参数
 - 部分版本的某些方法可能未完全实现
