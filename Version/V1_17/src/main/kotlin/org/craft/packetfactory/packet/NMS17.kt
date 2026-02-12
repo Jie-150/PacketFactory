@@ -694,11 +694,27 @@ internal class NMS17 : NMSOut {
         return PacketPlayOutViewCentre(x, z)
     }
 
+    /**
+     * 创建客户端视图距离网络数据包
+     *
+     * @param data 包含视图距离信息的数据对象，需要包含以下字段：
+     *             - radius: Int 渲染距离（区块半径）（必需）
+     * @return PacketPlayOutViewDistance 客户端视图距离S2C数据包
+     */
     override fun createViewDistance(data: PacketData): Any {
         val radius = data.read<Int>("radius")
         return PacketPlayOutViewDistance(radius)
     }
 
+    /**
+     * 创建容器数据更新网络数据包
+     *
+     * @param data 包含容器数据信息的数据对象，需要包含以下字段：
+     *             - containerId: Int 容器网络ID（必需）
+     *             - id: Int 数据属性ID（必需）
+     *             - value: Int 属性数值（必需）
+     * @return PacketPlayOutWindowData 容器数据更新S2C数据包
+     */
     override fun createWindowData(data: PacketData): Any {
         val containerId = data.read<Int>("containerId")
         val id = data.read<Int>("id")
