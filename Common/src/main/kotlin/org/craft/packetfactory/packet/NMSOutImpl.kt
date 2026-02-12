@@ -1,7 +1,6 @@
 package org.craft.packetfactory.packet
 
 import com.mojang.authlib.GameProfile
-import com.mojang.brigadier.context.StringRange
 import com.mojang.brigadier.suggestion.Suggestion
 import com.mojang.brigadier.suggestion.Suggestions
 import com.mojang.brigadier.tree.RootCommandNode
@@ -13,22 +12,16 @@ import net.minecraft.server.v1_16_R3.*
 import net.minecraft.server.v1_8_R3.PacketPlayOutSpawnEntityLiving
 import org.bukkit.Location
 import org.bukkit.Material
-import org.bukkit.Statistic
+import org.bukkit.Particle
 import org.bukkit.attribute.Attribute
-import org.bukkit.attribute.AttributeModifier
 import org.bukkit.command.TabCompleter
-import org.bukkit.craftbukkit.libs.it.unimi.dsi.fastutil.objects.Object2IntMap
-import org.bukkit.craftbukkit.libs.it.unimi.dsi.fastutil.objects.Object2IntMaps
 import org.bukkit.craftbukkit.libs.it.unimi.dsi.fastutil.shorts.ShortSets
-import org.bukkit.craftbukkit.v1_16_R3.CraftStatistic
+import org.bukkit.craftbukkit.v1_16_R3.CraftParticle
 import org.bukkit.craftbukkit.v1_16_R3.CraftWorld
-import org.bukkit.craftbukkit.v1_16_R3.attribute.CraftAttributeInstance
 import org.bukkit.craftbukkit.v1_16_R3.attribute.CraftAttributeMap
 import org.bukkit.craftbukkit.v1_16_R3.inventory.CraftItemStack
 import org.bukkit.craftbukkit.v1_16_R3.util.CraftChatMessage
-import org.bukkit.craftbukkit.v1_16_R3.util.CraftNBTTagConfigSerializer
 import org.bukkit.entity.EntityType
-import org.bukkit.util.Consumer
 import org.bukkit.util.Vector
 import org.craft.packetfactory.MapData
 import taboolib.common.platform.function.pluginId
@@ -36,7 +29,6 @@ import taboolib.library.reflex.Reflex.Companion.getProperty
 import taboolib.library.reflex.Reflex.Companion.invokeConstructor
 import taboolib.library.reflex.Reflex.Companion.invokeMethod
 import taboolib.library.reflex.Reflex.Companion.setProperty
-import taboolib.module.chat.ComponentText
 import taboolib.module.nms.ItemTagData
 import taboolib.module.nms.MinecraftVersion
 import taboolib.module.nms.remap.require
@@ -180,9 +172,10 @@ internal class NMSOutImpl : NMSOut {
 
     override fun createEntityEquipment(data: PacketData): Any {
         val entityId = data.read<Int>("entityId")
-        val items = data.readOrElse<List<Map<String, org.bukkit.inventory.ItemStack>>>("items", emptyList()).flatMap { map ->
-            map.map { Pair(EnumItemSlot.valueOf(it.key.uppercase()), toNMSItem(it.value)) }
-        }
+        val items =
+            data.readOrElse<List<Map<String, org.bukkit.inventory.ItemStack>>>("items", emptyList()).flatMap { map ->
+                map.map { Pair(EnumItemSlot.valueOf(it.key.uppercase()), toNMSItem(it.value)) }
+            }
         return PacketPlayOutEntityEquipment(entityId, items)
     }
 
@@ -440,7 +433,14 @@ internal class NMSOutImpl : NMSOut {
         val players = data.read<List<PlayerData>>("players")
         return PacketPlayOutPlayerInfo().also {
             it.setProperty("a", PacketPlayOutPlayerInfo.EnumPlayerInfoAction.REMOVE_PLAYER)
-            val b = players.map { p -> it.PlayerInfoData(GameProfile(p.uuid, p.name), p.entityId, EnumGamemode.SURVIVAL, null) }
+            val b = players.map { p ->
+                it.PlayerInfoData(
+                    GameProfile(p.uuid, p.name),
+                    p.entityId,
+                    EnumGamemode.SURVIVAL,
+                    null
+                )
+            }
             it.setProperty("b", b)
 
         }
@@ -681,7 +681,8 @@ internal class NMSOutImpl : NMSOut {
         val ambient = data.readOrElse("ambient", false)
         val showParticles = data.readOrElse("showParticles", false)
         val showIcon = data.readOrElse("showIcon", false)
-        val mobEffect = MobEffect(MobEffectList.fromId(effectId), duration, amplification, ambient, showParticles, showIcon, null)
+        val mobEffect =
+            MobEffect(MobEffectList.fromId(effectId), duration, amplification, ambient, showParticles, showIcon, null)
         return PacketPlayOutEntityEffect(entityId, mobEffect)
     }
 
@@ -714,7 +715,14 @@ internal class NMSOutImpl : NMSOut {
         val strength = data.readOrElse("strength", 1.0f)
         val locations = data.readOrElse("locations", emptyList<Location>()).map { it.toPosition() }
         val motion = data.readOrElse("motion", Vector())
-        return PacketPlayOutExplosion(location.x, location.y, location.z, strength, locations, Vec3D(motion.x, motion.y, motion.z))
+        return PacketPlayOutExplosion(
+            location.x,
+            location.y,
+            location.z,
+            strength,
+            locations,
+            Vec3D(motion.x, motion.y, motion.z)
+        )
     }
 
     override fun createGameStateChange(data: PacketData): Any {
@@ -763,7 +771,13 @@ internal class NMSOutImpl : NMSOut {
         val locked = data.readOrElse("locked", false)
         val colors = data.readOrElse("colors", ByteArray(128 * 128))
         val maps = data.readOrElse("map", emptyList<MapData>()).map {
-            MapIcon(data.readEnumOrElse(MapIcon.Type::class.java, "type", MapIcon.Type.PLAYER), it.x, it.z, it.rotation, component(it.name))
+            MapIcon(
+                data.readEnumOrElse(MapIcon.Type::class.java, "type", MapIcon.Type.PLAYER),
+                it.x,
+                it.z,
+                it.rotation,
+                component(it.name)
+            )
         }
         val startX = data.readOrElse("startX", 0)
         val startZ = data.readOrElse("startZ", 0)
@@ -918,7 +932,11 @@ internal class NMSOutImpl : NMSOut {
         val criteria = data.readOrNull<String>("criteria")
 
         return if (version >= 11300) {
-            val healthDisplay = data.readEnumOrElse(NMS16ScoreboardHealthDisplay::class.java, "healthDisplay", NMS16ScoreboardHealthDisplay.INTEGER)
+            val healthDisplay = data.readEnumOrElse(
+                NMS16ScoreboardHealthDisplay::class.java,
+                "healthDisplay",
+                NMS16ScoreboardHealthDisplay.INTEGER
+            )
             val displayName = component(data.readOrElse("displayName", ""))
             val objective = NMS16ScoreboardObjective(
                 NMS16Scoreboard(),
@@ -941,7 +959,11 @@ internal class NMSOutImpl : NMSOut {
     override fun createScoreboardObjective(data: PacketData): Any {
         val objectiveName = data.read<String>("objectiveName")
         val criteria = data.readOrElse("criteria", "AIR").uppercase()
-        val healthDisplay = data.readEnumOrElse(NMS16ScoreboardHealthDisplay::class.java, "healthDisplay", NMS16ScoreboardHealthDisplay.INTEGER)
+        val healthDisplay = data.readEnumOrElse(
+            NMS16ScoreboardHealthDisplay::class.java,
+            "healthDisplay",
+            NMS16ScoreboardHealthDisplay.INTEGER
+        )
         val displayName = component(data.readOrElse("displayName", ""))
         val objective = NMS16ScoreboardObjective(
             NMS16Scoreboard(),
@@ -1104,8 +1126,25 @@ internal class NMSOutImpl : NMSOut {
     }
 
     override fun createWorldParticles(data: PacketData): Any {
-        PacketPlayOutWorldParticles()
-        TODO("Not yet implemented")
+        val type = CraftParticle.toNMS(data.read<Particle>("type"))
+        val overrideLimiter = data.readOrElse("overrideLimiter", false)
+        val location = data.read<Location>("location")
+        val vector = data.readOrElse("vector", Vector())
+        val maxSpeed = data.readOrElse("maxSpeed", 1.0f)
+        val count = data.readOrElse("count", 1)
+
+        return PacketPlayOutWorldParticles(
+            type,
+            overrideLimiter,
+            location.x,
+            location.y,
+            location.z,
+            vector.x.toFloat(),
+            vector.y.toFloat(),
+            vector.z.toFloat(),
+            maxSpeed,
+            count
+        )
     }
 
     override fun createNamedEntitySpawn(data: PacketData): Any {
@@ -1196,13 +1235,25 @@ internal class NMSOutImpl : NMSOut {
     @Suppress("UNCHECKED_CAST")
     fun getOptionalDataWatcher(value: Optional<*>): DataWatcher.Item<out Optional<out Any?>?> {
         return when (value.getOrNull()) {
-            is IChatBaseComponent -> DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.f), value as Optional<IChatBaseComponent>)
+            is IChatBaseComponent -> DataWatcher.Item(
+                DataWatcher.a(Entity::class.java, DataWatcherRegistry.f),
+                value as Optional<IChatBaseComponent>
+            )
 
-            is IBlockData -> DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.h), value as Optional<IBlockData>)
+            is IBlockData -> DataWatcher.Item(
+                DataWatcher.a(Entity::class.java, DataWatcherRegistry.h),
+                value as Optional<IBlockData>
+            )
 
-            is BlockPosition -> DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.m), value as Optional<BlockPosition>)
+            is BlockPosition -> DataWatcher.Item(
+                DataWatcher.a(Entity::class.java, DataWatcherRegistry.m),
+                value as Optional<BlockPosition>
+            )
 
-            is UUID -> DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.o), value as Optional<UUID>)
+            is UUID -> DataWatcher.Item(
+                DataWatcher.a(Entity::class.java, DataWatcherRegistry.o),
+                value as Optional<UUID>
+            )
 
             else -> error("不支持的类型: $value")
         }
@@ -1216,7 +1267,12 @@ internal class NMSOutImpl : NMSOut {
         return if (MinecraftVersion.versionId >= 11605) {
             DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.i), value)
         } else {
-            DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry::class.java.getProperty<DataWatcherSerializer<Boolean>>("h", true)!!), value)
+            DataWatcher.Item(
+                DataWatcher.a(
+                    Entity::class.java,
+                    DataWatcherRegistry::class.java.getProperty<DataWatcherSerializer<Boolean>>("h", true)!!
+                ), value
+            )
         }
     }
 

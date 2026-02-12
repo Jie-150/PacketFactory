@@ -656,7 +656,8 @@ internal class NMS17 : NMSOut {
     }
 
     override fun createViewDistance(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val radius = data.read<Int>("radius")
+        return PacketPlayOutViewDistance(radius)
     }
 
     override fun createWindowData(data: PacketData): Any {

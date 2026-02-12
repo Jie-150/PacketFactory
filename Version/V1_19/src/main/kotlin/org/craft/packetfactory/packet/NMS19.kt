@@ -637,15 +637,21 @@ internal class NMS19 : NMSOut {
     }
 
     override fun createViewCentre(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val x = data.read<Int>("x")
+        val z = data.read<Int>("z")
+        return PacketPlayOutViewCentre(x, z)
     }
 
     override fun createViewDistance(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val radius = data.read<Int>("radius")
+        return PacketPlayOutViewDistance(radius)
     }
 
     override fun createWindowData(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val containerId = data.read<Int>("containerId")
+        val id = data.read<Int>("id")
+        val value = data.read<Int>("value")
+        return PacketPlayOutWindowData(containerId, id, value)
     }
 
     override fun createWindowItems(data: PacketData): Any {
