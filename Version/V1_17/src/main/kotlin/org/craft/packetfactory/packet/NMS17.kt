@@ -28,6 +28,17 @@ import java.util.*
 import kotlin.jvm.optionals.getOrNull
 
 internal class NMS17 : NMSOut {
+    /**
+     * 创建实体生成数据包
+     *
+     * @param data 包含实体生成信息的数据对象，需要包含以下字段：
+     *             - entityType: String 实体类型名称（必需）
+     *             - entityId: Int 实体ID（必需）
+     *             - uuid: UUID 实体UUID（必需）
+     *             - location: Location 生成位置（必需）
+     *             - data: Int 实体数据（可选，默认0）
+     * @return PacketPlayOutSpawnEntity 实体生成数据包实例
+     */
     override fun createSpawnEntity(data: PacketData): Any {
         val entityType = data.read<String>("entityType")
         val entityId = data.read<Int>("entityId")
@@ -50,6 +61,17 @@ internal class NMS17 : NMSOut {
         )
     }
 
+    /**
+     * 创建生物实体生成数据包
+     *
+     * @param data 包含生物实体生成信息的数据对象，需要包含以下字段：
+     *             - entityId: Int 实体ID（必需）
+     *             - uuid: UUID 实体UUID（必需）
+     *             - entityType: EntityType 生物实体类型（必需）
+     *             - location: Location 生成位置（必需）
+     *             - yHeadRot: Int 头部旋转角度（可选，默认0）
+     * @return PacketPlayOutSpawnEntityLiving 生物实体生成数据包实例
+     */
     override fun createSpawnEntityLiving(data: PacketData): Any {
         val entityId = data.read<Int>("entityId")
         val uuid = data.read<UUID>("uuid")
@@ -72,6 +94,15 @@ internal class NMS17 : NMSOut {
         }
     }
 
+    /**
+     * 创建经验球实体生成数据包
+     *
+     * @param data 包含经验球生成信息的数据对象，需要包含以下字段：
+     *             - id: Int 经验球ID（必需）
+     *             - location: Location 生成位置（必需）
+     *             - value: Int 经验值（可选，默认0）
+     * @return PacketPlayOutSpawnEntityExperienceOrb 经验球实体生成数据包实例
+     */
     override fun createSpawnEntityExperienceOrb(data: PacketData): Any {
         val id = data.read<Int>("id")
         val location = data.read<Location>("location")
@@ -649,6 +680,14 @@ internal class NMS17 : NMSOut {
         TODO("Not yet implemented")
     }
 
+    /**
+     * 创建视图中心数据包
+     *
+     * @param data 包含视图中心坐标信息的数据对象，需要包含以下字段：
+     *             - x: Int X坐标（必需）
+     *             - z: Int Z坐标（必需）
+     * @return PacketPlayOutViewCentre 视图中心数据包实例
+     */
     override fun createViewCentre(data: PacketData): Any {
         val x = data.read<Int>("x")
         val z = data.read<Int>("z")
@@ -667,6 +706,16 @@ internal class NMS17 : NMSOut {
         return PacketPlayOutWindowData(containerId, id, value)
     }
 
+    /**
+     * 创建容器物品同步网络数据包
+     *
+     * @param data 包含容器物品信息的数据对象，需要包含以下字段：
+     *             - containerId: Int 容器网络ID（必需）
+     *             - stateId: Int 容器状态版本（必需）
+     *             - items: List<ItemStack> 容器物品槽位列表（可选）
+     *             - emptyItemStack: ItemStack 空物品栈占位符（可选，默认AIR）
+     * @return PacketPlayOutWindowItems 容器物品同步S2C数据包
+     */
     override fun createWindowItems(data: PacketData): Any {
         val containerId = data.read<Int>("containerId")
         val stateId = data.read<Int>("stateId")
@@ -678,6 +727,16 @@ internal class NMS17 : NMSOut {
         return PacketPlayOutWindowItems(containerId, stateId, items, carriedItem)
     }
 
+    /**
+     * 创建世界音效/粒子事件网络数据包
+     *
+     * @param data 包含世界事件信息的数据对象，需要包含以下字段：
+     *             - type: Int 事件类型ID（必需）
+     *             - location: Location 世界事件坐标（必需）
+     *             - data: Int 事件附加数据（必需）
+     *             - globalEvent: Boolean 是否广播到所有玩家（必需）
+     * @return PacketPlayOutWorldEvent 世界事件S2C数据包
+     */
     override fun createWorldEvent(data: PacketData): Any {
         val type = data.read<Int>("type")
         val location = data.read<Location>("location")
@@ -686,6 +745,18 @@ internal class NMS17 : NMSOut {
         return PacketPlayOutWorldEvent(type, location.toPosition(), dataValue, globalEvent)
     }
 
+    /**
+     * 创建世界粒子效果网络数据包
+     *
+     * @param data 包含粒子效果信息的数据对象，需要包含以下字段：
+     *             - type: Particle 粒子类型（必需）
+     *             - overrideLimiter: Boolean 是否忽略客户端粒子限制（可选，默认false）
+     *             - location: Location 粒子生成坐标（必需）
+     *             - vector: Vector 粒子运动向量（可选，默认零向量）
+     *             - maxSpeed: Float 粒子最大扩散速度（可选，默认1.0f）
+     *             - count: Int 粒子生成数量（可选，默认1）
+     * @return PacketPlayOutWorldParticles 世界粒子效果S2C数据包
+     */
     override fun createWorldParticles(data: PacketData): Any {
         val type = CraftParticle.toNMS(data.read<Particle>("type"))
         val overrideLimiter = data.readOrElse("overrideLimiter", false)
@@ -708,6 +779,15 @@ internal class NMS17 : NMSOut {
         )
     }
 
+    /**
+     * 创建玩家实体生成网络数据包
+     *
+     * @param data 包含玩家实体生成信息的数据对象，需要包含以下字段：
+     *             - entityId: Int 玩家实体网络ID（必需）
+     *             - uuid: UUID 玩家UUID（必需）
+     *             - location: Location 世界生成坐标（必需）
+     * @return PacketPlayOutNamedEntitySpawn 玩家实体生成S2C数据包
+     */
     override fun createNamedEntitySpawn(data: PacketData): Any {
         val entityId = data.read<Int>("entityId")
         val uuid = data.read<UUID>("uuid")
