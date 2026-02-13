@@ -29,8 +29,6 @@ subprojects {
         compileOnly(kotlin("stdlib"))
         // server
         compileOnly("com.google.code.gson:gson:2.8.7")
-        compileOnly("ink.ptms.core:v11605:11605")
-        compileOnly("ink.ptms:nms-all:1.0.0")
     }
     tasks.withType<JavaCompile> {
         options.encoding = "UTF-8"

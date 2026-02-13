@@ -41,7 +41,7 @@ dependencies {
 
 ```kotlin
 taboolib {
-    relocate("org.craft.packetfactory", "${project.group}.libs.packetfactory")
+    relocate("org.craft.packetfactory", "${project.group}.packetfactory")
 }
 ```
 

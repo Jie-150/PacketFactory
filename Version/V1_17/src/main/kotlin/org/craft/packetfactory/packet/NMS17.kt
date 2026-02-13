@@ -1,30 +1,62 @@
 package org.craft.packetfactory.packet
 
+import com.mojang.authlib.GameProfile
+import com.mojang.datafixers.util.Pair
+import it.unimi.dsi.fastutil.ints.IntArrayList
+import it.unimi.dsi.fastutil.shorts.ShortSets
+import net.minecraft.commands.arguments.ArgumentAnchor
 import net.minecraft.core.*
 import net.minecraft.core.particles.ParticleParam
 import net.minecraft.nbt.NBTTagCompound
+import net.minecraft.network.chat.ChatComponentText
+import net.minecraft.network.chat.ChatMessageType
 import net.minecraft.network.chat.IChatBaseComponent
 import net.minecraft.network.protocol.game.*
 import net.minecraft.network.syncher.DataWatcher
 import net.minecraft.network.syncher.DataWatcherRegistry
 import net.minecraft.resources.MinecraftKey
+import net.minecraft.server.ScoreboardServer
+import net.minecraft.server.bossevents.BossBattleCustom
+import net.minecraft.sounds.SoundCategory
+import net.minecraft.sounds.SoundEffect
+import net.minecraft.world.BossBattle
+import net.minecraft.world.EnumHand
+import net.minecraft.world.effect.MobEffect
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.EntityPose
+import net.minecraft.world.entity.EnumItemSlot
 import net.minecraft.world.entity.npc.VillagerData
+import net.minecraft.world.entity.player.PlayerAbilities
 import net.minecraft.world.item.ItemStack
+import net.minecraft.world.level.EnumGamemode
 import net.minecraft.world.level.block.state.IBlockData
+import net.minecraft.world.level.border.WorldBorder
+import net.minecraft.world.level.chunk.ChunkSection
+import net.minecraft.world.level.saveddata.maps.MapIcon
 import net.minecraft.world.phys.Vec3D
+import net.minecraft.world.scores.Scoreboard
+import net.minecraft.world.scores.ScoreboardObjective
+import net.minecraft.world.scores.ScoreboardTeam
+import net.minecraft.world.scores.criteria.IScoreboardCriteria
 import org.bukkit.Location
 import org.bukkit.Material
 import org.bukkit.Particle
+import org.bukkit.block.Block
 import org.bukkit.craftbukkit.v1_17_R1.CraftParticle
 import org.bukkit.craftbukkit.v1_17_R1.inventory.CraftItemStack
+import org.bukkit.craftbukkit.v1_17_R1.util.CraftChatMessage
 import org.bukkit.entity.EntityType
 import org.bukkit.util.Vector
+import org.craft.packetfactory.data.MapData
+import org.craft.packetfactory.data.PacketData
+import org.craft.packetfactory.data.PlayerData
+import taboolib.common.platform.function.pluginId
+import taboolib.library.reflex.Reflex.Companion.invokeConstructor
 import taboolib.library.reflex.Reflex.Companion.setProperty
 import taboolib.library.reflex.Reflex.Companion.unsafeInstance
 import taboolib.module.nms.remap.require
 import java.util.*
+import kotlin.jvm.java
 import kotlin.jvm.optionals.getOrNull
 
 internal class NMS17 : NMSOut {
@@ -117,395 +149,585 @@ internal class NMS17 : NMSOut {
     }
 
     override fun createTeleportPosition(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val entityId = data.read<Int>("entityId")
+        val location = data.read<Location>("location")
+        val onGround = data.read<Boolean>("onGround")
+        return PacketPlayOutEntityTeleport::class.java.unsafeInstance().also {
+            it.setProperty("id", entityId)
+            it.setProperty("x", location.x)
+            it.setProperty("y", location.y)
+            it.setProperty("z", location.z)
+            it.setProperty("yRot", mathRot(location.pitch))
+            it.setProperty("xRot", mathRot(location.yaw))
+            it.setProperty("onGround", onGround)
+        }
     }
 
     override fun createEntityHeadRotation(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val entityId = data.read<Int>("entityId")
+        val pitch = data.read<Float>("pitch")
+        return PacketPlayOutEntityHeadRotation::class.java.unsafeInstance().also {
+            it.setProperty("id", entityId)
+            it.setProperty("yHeadRot", mathRot(pitch))
+        }
     }
 
     override fun createEntityMetadata(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val entityId = data.read<Int>("entityId")
+        val metadata = data.read<List<Any>>("metadata").map { getDataWatcherItem(it) }
+        return PacketPlayOutEntityMetadata::class.java.unsafeInstance().also {
+            it.setProperty("id", entityId)
+            it.setProperty("packedItems", metadata)
+        }
     }
 
     override fun createEntityDestroy(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val entitys = IntArrayList(data.read<List<Int>>("entitys"))
+        return PacketPlayOutEntityDestroy(entitys)
     }
 
     override fun createRelEntityMove(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val entityId = data.read<Int>("entityId")
+        val location = data.readOrElse("location", emptyLocation)
+        val onGround = data.readOrElse("onGround", false)
+        return PacketPlayOutEntity.PacketPlayOutRelEntityMove(
+            entityId,
+            location.blockX.toShort(),
+            location.blockY.toShort(),
+            location.blockZ.toShort(),
+            onGround
+        )
     }
 
     override fun createEntityLook(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val entityId = data.read<Int>("entityId")
+        val yaw = data.read<Byte>("yaw")
+        val pitch = data.read<Byte>("pitch")
+        val onGround = data.readOrElse("onGround", false)
+        return PacketPlayOutEntity.PacketPlayOutEntityLook(entityId, pitch, yaw, onGround)
     }
 
     override fun createRelEntityMoveLook(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val entityId = data.read<Int>("entityId")
+        val location = data.read<Location>("location")
+        val onGround = data.readOrElse("onGround", false)
+        return PacketPlayOutEntity.PacketPlayOutRelEntityMoveLook(
+            entityId,
+            location.x.toInt().toShort(),
+            location.y.toInt().toShort(),
+            location.z.toInt().toShort(),
+            location.pitch.toInt().toByte(),
+            location.yaw.toInt().toByte(),
+            onGround
+        )
     }
 
     override fun createEntityEquipment(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val entityId = data.read<Int>("entityId")
+        val equipments = data.read<Map<String, org.bukkit.inventory.ItemStack>>("equipments").map {
+            Pair(EnumItemSlot.valueOf(it.key.uppercase()), toNMSItem(it.value))
+        }
+        return PacketPlayOutEntityEquipment(entityId, equipments)
     }
 
     override fun createAnimation(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val entityId = data.read<Int>("entityId")
+        val action = data.read<Int>("action")
+        return PacketPlayOutAnimation::class.java.unsafeInstance().also {
+            it.setProperty("id", entityId)
+            it.setProperty("action", action)
+        }
     }
 
     override fun createAttachEntity(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val sourceId = data.read<Int>("sourceId")
+        val destId = data.read<Int>("destId")
+        return PacketPlayOutAttachEntity::class.java.unsafeInstance().also {
+            it.setProperty("sourceId", sourceId)
+            it.setProperty("destId", destId)
+        }
     }
 
     override fun createEntityVelocity(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val entityId = data.read<Int>("entityId")
+        val vector = data.read<Vector>("vector")
+        return PacketPlayOutEntityVelocity(entityId, Vec3D(vector.x, vector.y, vector.z))
     }
 
     override fun createBed(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createClearDialog(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createKeepAlive(data: PacketData): Any {
-        TODO("Not yet implemented")
+        return PacketPlayOutKeepAlive(data.read<Long>("id"))
     }
 
     override fun createPing(data: PacketData): Any {
-        TODO("Not yet implemented")
+        return ClientboundPingPacket(data.read<Int>("id"))
     }
 
     override fun createResourcePackPop(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createResourcePackPush(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createServerLinks(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createShowDialog(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createStoreCookie(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createTransfer(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createUpdateTags(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createClientInformation(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createCustomClickAction(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createCustomPayload(data: PacketData): Any {
-        TODO("Not yet implemented")
+        throw UnsupportedOperationException("暂未实现")
     }
 
     override fun createPong(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createResourcePack(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createCodeOfConduct(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createFinishConfiguration(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createRegistryData(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createResetChat(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createSelectKnown(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createUpdateEnabledFeatures(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createAcceptCodeOfConduct(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createCookieRequest(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createCookieResponse(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createBlockChangedAck(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createBundleDelimiter(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createChunkBatchFinished(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createChunkBatchStart(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createChunksBiomes(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createClearTitles(data: PacketData): Any {
-        TODO("Not yet implemented")
+        return ClientboundClearTitlesPacket(data.readOrElse("clear", true))
     }
 
     override fun createCustomChatCompletions(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createDamageEvent(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createDebugBlockValue(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createDebugChunkValue(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createDebugEntityValue(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createDebugEvent(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createDebugSample(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createDeleteChat(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createDisguisedChat(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createEntityPositionSync(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createGameTestHighlightPos(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createHurtAnimation(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createInitializeBorder(data: PacketData): Any {
-        TODO("Not yet implemented")
+        throw UnsupportedOperationException("暂未实现")
     }
 
     override fun createLevelChunkWithLight(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createMoveMinecart(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createPlayerChat(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val text = component(data.read<String>("text"))
+        val type = data.readEnum(ChatMessageType::class.java, "text")
+        val uuid = data.read<UUID>("uuid")
+        return PacketPlayOutChat(text, type, uuid)
     }
 
     override fun createPlayerCombatEnd(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val killer = data.read<Int>("killer")
+        val duration = data.read<Int>("duration")
+        return ClientboundPlayerCombatEndPacket(killer, duration)
     }
 
     override fun createPlayerCombatEnter(data: PacketData): Any {
-        TODO("Not yet implemented")
+        return ClientboundPlayerCombatEnterPacket()
     }
 
     override fun createPlayerCombatKill(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val player = data.read<Int>("player")
+        val killer = data.read<Int>("killer")
+        val message = component(data.read("text"))
+        return ClientboundPlayerCombatKillPacket(player, killer, message)
     }
 
     override fun createPlayerInfoRemove(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val players = data.read<List<PlayerData>>("players").map {
+            PacketPlayOutPlayerInfo.PlayerInfoData(GameProfile(it.uuid, it.name), it.ping, EnumGamemode.valueOf(it.gamemode.name), null)
+        }
+        return PacketPlayOutPlayerInfo::class.java.unsafeInstance().also {
+            it.setProperty("action", PacketPlayOutPlayerInfo.EnumPlayerInfoAction.REMOVE_PLAYER)
+            it.setProperty("entries", players)
+        }
     }
 
     override fun createPlayerInfoUpdate(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val type = PacketPlayOutPlayerInfo.EnumPlayerInfoAction.valueOf("UPDATE_" + data.read<String>("type").uppercase())
+        val players = data.read<List<PlayerData>>("players").map {
+            PacketPlayOutPlayerInfo.PlayerInfoData(GameProfile(it.uuid, it.name), it.ping, EnumGamemode.valueOf(it.gamemode.name), null)
+        }
+        return PacketPlayOutPlayerInfo::class.java.unsafeInstance().also {
+            it.setProperty("action", type)
+            it.setProperty("entries", players)
+        }
     }
 
     override fun createPlayerRotation(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createProjectilePower(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createRecipeBookAdd(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createRecipeBookRemove(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createRecipeBookSettings(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createResetScore(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createServerData(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createSetActionBarText(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val text = component(data.read("text"))
+        return ClientboundSetActionBarTextPacket(text)
     }
 
     override fun createSetBorderCenter(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val border = WorldBorder()
+        border.setCenter(data.read("x"), data.read("z"))
+        return ClientboundSetBorderCenterPacket(border)
     }
 
     override fun createSetBorderLerpSize(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val oldSize = data.read<Double>("oldSize")
+        val newSize = data.read<Double>("newSize")
+        val lerpTime = data.read<Int>("lerpTime")
+        return ClientboundSetBorderLerpSizePacket(WorldBorder()).also {
+            it.setProperty("oldSize", oldSize)
+            it.setProperty("newSize", newSize)
+            it.setProperty("lerpTime", lerpTime)
+        }
     }
 
     override fun createSetBorderSize(data: PacketData): Any {
-        TODO("Not yet implemented")
+        return ClientboundSetBorderSizePacket(WorldBorder()).also {
+            it.setProperty("size", data.read<Double>("size"))
+        }
     }
 
     override fun createSetBorderWarningDelay(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val border = WorldBorder()
+        border.warningTime = data.read("warningTime")
+        return ClientboundSetBorderWarningDelayPacket(border)
     }
 
     override fun createSetBorderWarningDistance(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val border = WorldBorder()
+        border.warningDistance = data.read("warningDistance")
+        return ClientboundSetBorderWarningDistancePacket(border)
     }
 
     override fun createSetCursorItem(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createSetPlayerInventory(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createSetSimulationDistance(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createSetSubtitleText(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val text = component(data.read("text"))
+        return ClientboundSetSubtitleTextPacket(text)
     }
 
     override fun createSetTitlesAnimation(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val fadeIn = data.read<Int>("fadeIn")
+        val stay = data.read<Int>("stay")
+        val fadeOut = data.read<Int>("fadeOut")
+        return ClientboundSetTitlesAnimationPacket(fadeIn, stay, fadeOut)
     }
 
     override fun createSetTitleText(data: PacketData): Any {
-        TODO("Not yet implemented")
+        return ClientboundSetTitleTextPacket(component(data.read("title")))
     }
 
     override fun createStartConfiguration(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createSystemChat(data: PacketData): Any {
-        TODO("Not yet implemented")
+        return PacketPlayOutChat(component(data.read("text")), ChatMessageType.SYSTEM, data.read("uuid"))
     }
 
     override fun createTestInstanceBlockStatus(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createTickingState(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createTickingStep(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createTrackedWaypoint(data: PacketData): Any {
-        TODO("Not yet implemented")
+        unsupported()
     }
 
     override fun createAbilities(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val abilities = PlayerAbilities()
+        data.readNotNull<Boolean>("invulnerable") {
+            abilities.invulnerable = it
+        }.readNotNull<Boolean>("isFlying") {
+            abilities.flying = it
+        }.readNotNull<Boolean>("canFly") {
+            abilities.mayfly = it
+        }.readNotNull<Boolean>("instabuild") {
+            abilities.instabuild = it
+        }.readNotNull<Float>("flyingSpeed") {
+            abilities.flyingSpeed = it
+        }.readNotNull<Float>("walkingSpeed") {
+            abilities.walkingSpeed = it
+        }
+        return PacketPlayOutAbilities(abilities)
     }
 
     override fun createAdvancements(data: PacketData): Any {
-        TODO("Not yet implemented")
+        throw UnsupportedOperationException("暂未实现")
     }
 
     override fun createAutoRecipe(data: PacketData): Any {
-        TODO("Not yet implemented")
+        throw UnsupportedOperationException("暂未实现")
     }
 
     override fun createBlockAction(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val location = data.read<Location>("location").toPosition()
+        val block = IRegistry.BLOCK[MinecraftKey(data.read<Block>("block").type.name)]
+        val x = data.read<Int>("x")
+        val z = data.read<Int>("z")
+        return PacketPlayOutBlockAction(location, block, x, z)
     }
 
     override fun createBlockBreakAnimation(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val id = data.read<Int>("id")
+        val location = data.read<Location>("location").toPosition()
+        val progress = data.read<Int>("progress")
+        return PacketPlayOutBlockBreakAnimation(id, location, progress)
     }
 
     override fun createBlockChange(data: PacketData): Any {
-        TODO("Not yet implemented")
+        throw UnsupportedOperationException("暂未实现")
     }
 
     override fun createBossBar(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val uuid = data.read<UUID>("uuid")
+        val boss = BossBattleCustom(MinecraftKey(pluginId, "bossbar"), component(data.read("text")))
+        return when (data.read<String>("action")) {
+            "add" -> {
+                data.readNotNull<String>("name") {
+                    boss.name = component(it)
+                }.readNotNull<Float>("progress") {
+                    boss.progress = it
+                }.readNotNull<String>("color") {
+                    boss.color = BossBattle.BarColor.valueOf(it.uppercase())
+                }.readNotNull<String>("style") {
+                    boss.overlay = BossBattle.BarStyle.valueOf(it.uppercase())
+                }.readNotNull<Boolean>("darkenScreen") {
+                    boss.isDarkenSky = it
+                }.readNotNull<Boolean>("playMusic") {
+                    boss.isPlayMusic = it
+                }.readNotNull<Boolean>("createWorldFog") {
+                    boss.isCreateFog = it
+                }
+                PacketPlayOutBoss.createAddPacket(boss)
+            }
+
+            "remove" -> {
+                PacketPlayOutBoss.createRemovePacket(uuid)
+            }
+
+            "progress" -> {
+                data.readNotNull<Float>("progress") {
+                    boss.progress = it
+                }
+                PacketPlayOutBoss.createUpdateProgressPacket(boss)
+            }
+
+            "name" -> {
+                data.readNotNull<String>("name") {
+                    boss.name = component(it)
+                }
+                PacketPlayOutBoss.createUpdateNamePacket(boss)
+            }
+
+            "style" -> {
+                data.readNotNull<String>("color") {
+                    boss.color = BossBattle.BarColor.valueOf(it.uppercase())
+                }.readNotNull<String>("overlay") {
+                    boss.overlay = BossBattle.BarStyle.valueOf(it.uppercase())
+                }
+                PacketPlayOutBoss.createUpdateStylePacket(boss)
+            }
+
+            "properties" -> {
+                data.readNotNull<Boolean>("darkenSky") {
+                    boss.isDarkenSky = it
+                }.readNotNull<Boolean>("playMusic") {
+                    boss.isPlayMusic = it
+                }.readNotNull<Boolean>("createFog") {
+                    boss.isCreateFog = it
+                }
+                PacketPlayOutBoss.createUpdatePropertiesPacket(boss)
+            }
+
+            else -> error("不支持的类型")
+        }
     }
 
     override fun createCamera(data: PacketData): Any {
-        TODO("Not yet implemented")
+        return PacketPlayOutCamera::class.java.unsafeInstance().also {
+            it.setProperty("cameraId", data.read<Int>("cameraId"))
+        }
     }
 
     override fun createCloseWindow(data: PacketData): Any {
-        TODO("Not yet implemented")
+        return PacketPlayOutCloseWindow(data.read<Int>("containerId"))
     }
 
     override fun createCollect(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val itemId = data.read<Int>("itemId")
+        val playerId = data.read<Int>("playerId")
+        val amount = data.read<Int>("amount")
+        return PacketPlayOutCollect(itemId, playerId, amount)
     }
 
     override fun createCommands(data: PacketData): Any {
@@ -513,27 +735,57 @@ internal class NMS17 : NMSOut {
     }
 
     override fun createEntityEffect(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val entityId = data.read<Int>("entityId")
+        val effect = IRegistry.MOB_EFFECT.fromId(data.read("effectId"))
+        val duration = data.readOrElse("duration", 0)
+        val amplifier = data.readOrElse("amplifier", 0)
+        val ambient = data.readOrElse("ambient", false)
+        val visible = data.readOrElse("visible", true)
+        val showIcon = data.readOrElse("showIcon", true)
+        return PacketPlayOutEntityEffect(entityId, MobEffect(effect, duration, amplifier, ambient, visible, showIcon))
     }
 
     override fun createEntitySound(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val sound = data.read<String>("sound")
+        val soundEffect = SoundEffect(MinecraftKey(pluginId, "entity_sound_$sound"))
+        val category = data.readEnumOrElse(SoundCategory::class.java, "category", SoundCategory.PLAYERS)
+        val entityId = data.read<Int>("entityId")
+        val volume = data.readOrElse("volume", 0.0f)
+        val pitch = data.readOrElse("pitch", 0.0f)
+        return PacketPlayOutEntitySound::class.java.unsafeInstance().also {
+            it.setProperty("sound", soundEffect)
+            it.setProperty("source", category)
+            it.setProperty("id", entityId)
+            it.setProperty("volume", volume)
+            it.setProperty("pitch", pitch)
+        }
     }
 
     override fun createEntityStatus(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val entityId = data.read<Int>("entityId")
+        val eventId = data.read<Int>("eventId")
+        return PacketPlayOutEntityStatus::class.java.unsafeInstance().also {
+            it.setProperty("entityId", entityId)
+            it.setProperty("eventId", eventId)
+        }
     }
 
     override fun createExplosion(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val location = data.read<Location>("location")
+        val power = data.read<Float>("power")
+        val positions = data.read<List<Location>>("positions").map { it.toPosition() }
+        val vector = data.read<Vector>("vector")
+        return PacketPlayOutExplosion(location.x, location.y, location.z, power, positions, Vec3D(vector.x, vector.y, vector.z))
     }
 
     override fun createGameStateChange(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val change = data.read<Int>("change")
+        val param = data.read<Float>("param")
+        return PacketPlayOutGameStateChange(PacketPlayOutGameStateChange.a(change), param)
     }
 
     override fun createHeldItemSlot(data: PacketData): Any {
-        TODO("Not yet implemented")
+        return PacketPlayOutHeldItemSlot(data.read<Int>("slot"))
     }
 
     override fun createLightUpdate(data: PacketData): Any {
@@ -541,27 +793,47 @@ internal class NMS17 : NMSOut {
     }
 
     override fun createLogin(data: PacketData): Any {
-        TODO("Not yet implemented")
+        TODO("该包目前不知道什么作用,参数过长暂时不做")
     }
 
     override fun createLookAt(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val location = data.read<Location>("location")
+        val anchor = data.readEnum(ArgumentAnchor.Anchor::class.java, "anchor")
+        return PacketPlayOutLookAt(anchor, location.x, location.y, location.z)
     }
 
     override fun createMap(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val mapId = data.read<Int>("mapId")
+        val scale = data.read<Byte>("scale")
+        val locked = data.read<Boolean>("locked")
+        val maps = data.read<List<MapData>>("maps").map {
+            MapIcon(MapIcon.Type.valueOf(it.type), it.x, it.z, it.rotation, component(it.name))
+        }
+        return PacketPlayOutMap(mapId, scale, locked, maps, null)
     }
 
     override fun createMount(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val vehicle = data.read<Int>("vehicle")
+        val passengers = data.read<List<Int>>("passengers")
+        return PacketPlayOutMount::class.java.unsafeInstance().also {
+            it.setProperty("vehicle", vehicle)
+            it.setProperty("passengers", passengers.toTypedArray())
+        }
     }
 
     override fun createMultiBlockChange(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val location = data.read<Location>("location").toPosition()
+        return PacketPlayOutMultiBlockChange(SectionPosition.a(location), ShortSets.EMPTY_SET, ChunkSection(0), false)
     }
 
     override fun createNamedSoundEffect(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val sound = data.read<String>("sound")
+        val soundEffect = SoundEffect(MinecraftKey(pluginId, "entity_sound_$sound"))
+        val category = data.readEnumOrElse(SoundCategory::class.java, "category", SoundCategory.PLAYERS)
+        val location = data.read<Location>("location")
+        val volume = data.readOrElse("volume", 0.0f)
+        val pitch = data.readOrElse("pitch", 0.0f)
+        return PacketPlayOutNamedSoundEffect(soundEffect, category, location.x, location.y, location.z, volume, pitch)
     }
 
     override fun createNBTQuery(data: PacketData): Any {
@@ -569,19 +841,28 @@ internal class NMS17 : NMSOut {
     }
 
     override fun createOpenBook(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val hand = data.readEnum(EnumHand::class.java, "hand")
+        return PacketPlayOutOpenBook(hand)
     }
 
     override fun createOpenSignEditor(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val location = data.read<Location>("location").toPosition()
+        return PacketPlayOutOpenSignEditor(location)
     }
 
     override fun createOpenWindow(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val containerId = data.readOrElse("containerId", 0)
+        val type = data.readOrElse("type", "")
+        val title = component(data.readOrElse("title", ""))
+        val container = IRegistry.MENU.get(MinecraftKey(type))
+        return PacketPlayOutOpenWindow(containerId, container, title)
     }
 
     override fun createOpenWindowHorse(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val containerId = data.read<Int>("containerId")
+        val size = data.read<Int>("size")
+        val entityId = data.read<Int>("entityId")
+        return PacketPlayOutOpenWindowHorse(containerId, size, entityId)
     }
 
     override fun createOpenWindowMerchant(data: PacketData): Any {
@@ -609,19 +890,55 @@ internal class NMS17 : NMSOut {
     }
 
     override fun createScoreboardDisplayObjective(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val objectiveName = data.read<String>("name")
+        val slot = data.readOrElse("slot", 0)
+        val criteria = data.read<String>("criteria")
+        val displayName = data.read<String>("displayName")
+        val healthDisplay = data.readEnum(IScoreboardCriteria.EnumScoreboardHealthDisplay::class.java, "healthDisplay")
+        val objective = ScoreboardObjective(Scoreboard(), objectiveName, IScoreboardCriteria.a(criteria).get(), component(displayName), healthDisplay)
+        return PacketPlayOutScoreboardDisplayObjective(slot, objective)
     }
 
     override fun createScoreboardObjective(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val objectiveName = data.read<String>("objectiveName")
+        val criteria = data.readOrElse("criteria", "AIR").uppercase()
+        val healthDisplay = data.readEnumOrElse(
+            IScoreboardCriteria.EnumScoreboardHealthDisplay::class.java,
+            "healthDisplay",
+            IScoreboardCriteria.EnumScoreboardHealthDisplay.INTEGER
+        )
+        val displayName = component(data.readOrElse("displayName", ""))
+        val objective = ScoreboardObjective(
+            Scoreboard(),
+            objectiveName,
+            IScoreboardCriteria.a(criteria).get(),
+            displayName,
+            healthDisplay
+        )
+        val action = data.read<Int>("action")
+        return PacketPlayOutScoreboardObjective(objective, action)
     }
 
     override fun createScoreboardScore(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val action = data.readEnumOrElse(ScoreboardServer.Action::class.java, "action", ScoreboardServer.Action.CHANGE)
+        val objectiveName = data.read<String>("objectiveName")
+        val score = data.readOrElse("score", 0)
+        val name = data.read<String>("name")
+        return PacketPlayOutScoreboardScore(action, objectiveName, name, score)
     }
 
     override fun createScoreboardTeam(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val uniqueName = data.read<String>("name")
+        val team = ScoreboardTeam(Scoreboard(), uniqueName)
+        data.readNotNull<String>("prefix") {
+            team.prefix = component(it)
+        }
+        data.readNotNull<String>("suffix") {
+            team.suffix = component(it)
+        }
+        val mode = data.read<Int>("mode")
+        val players = data.read<List<String>>("players")
+        return PacketPlayOutScoreboardTeam::class.java.invokeConstructor(uniqueName, mode, Optional.of(PacketPlayOutScoreboardTeam.a(team)), players)
     }
 
     override fun createSelectAdvancementTab(data: PacketData): Any {
@@ -737,22 +1054,12 @@ internal class NMS17 : NMSOut {
         val stateId = data.read<Int>("stateId")
         val items = NonNullList.a<ItemStack>()
         data.readOrNull<List<org.bukkit.inventory.ItemStack>>("items")
-            ?.forEach { i -> items.add(toNMSItem(i) as ItemStack) }
+            ?.forEach { i -> items.add(toNMSItem(i)) }
         val carriedItem =
-            toNMSItem(data.readOrElse("emptyItemStack", org.bukkit.inventory.ItemStack(Material.AIR))) as ItemStack
+            toNMSItem(data.readOrElse("emptyItemStack", org.bukkit.inventory.ItemStack(Material.AIR)))
         return PacketPlayOutWindowItems(containerId, stateId, items, carriedItem)
     }
 
-    /**
-     * 创建世界音效/粒子事件网络数据包
-     *
-     * @param data 包含世界事件信息的数据对象，需要包含以下字段：
-     *             - type: Int 事件类型ID（必需）
-     *             - location: Location 世界事件坐标（必需）
-     *             - data: Int 事件附加数据（必需）
-     *             - globalEvent: Boolean 是否广播到所有玩家（必需）
-     * @return PacketPlayOutWorldEvent 世界事件S2C数据包
-     */
     override fun createWorldEvent(data: PacketData): Any {
         val type = data.read<Int>("type")
         val location = data.read<Location>("location")
@@ -761,18 +1068,6 @@ internal class NMS17 : NMSOut {
         return PacketPlayOutWorldEvent(type, location.toPosition(), dataValue, globalEvent)
     }
 
-    /**
-     * 创建世界粒子效果网络数据包
-     *
-     * @param data 包含粒子效果信息的数据对象，需要包含以下字段：
-     *             - type: Particle 粒子类型（必需）
-     *             - overrideLimiter: Boolean 是否忽略客户端粒子限制（可选，默认false）
-     *             - location: Location 粒子生成坐标（必需）
-     *             - vector: Vector 粒子运动向量（可选，默认零向量）
-     *             - maxSpeed: Float 粒子最大扩散速度（可选，默认1.0f）
-     *             - count: Int 粒子生成数量（可选，默认1）
-     * @return PacketPlayOutWorldParticles 世界粒子效果S2C数据包
-     */
     override fun createWorldParticles(data: PacketData): Any {
         val type = CraftParticle.toNMS(data.read<Particle>("type"))
         val overrideLimiter = data.readOrElse("overrideLimiter", false)
@@ -824,7 +1119,22 @@ internal class NMS17 : NMSOut {
         TODO("Not yet implemented")
     }
 
-    private fun toNMSItem(itemStack: org.bukkit.inventory.ItemStack): Any {
+    private fun component(text: String): IChatBaseComponent {
+        return if (text.startsWith("{") && text.endsWith("}")) {
+            if (require(IChatBaseComponent.ChatSerializer::class.java)) {
+                listOf(
+                    { CraftChatMessage.fromJSON(text) },
+                    { IChatBaseComponent.ChatSerializer.a(text) }
+                ).firstNotNullOf { runCatching(it).getOrNull() }
+            } else {
+                CraftChatMessage.fromJSON(text)
+            }
+        } else {
+            ChatComponentText(text)
+        } as IChatBaseComponent
+    }
+
+    private fun toNMSItem(itemStack: org.bukkit.inventory.ItemStack): ItemStack {
         return CraftItemStack.asNMSCopy(itemStack)
     }
 
@@ -832,23 +1142,23 @@ internal class NMS17 : NMSOut {
         return BlockPosition(blockX, blockY, blockZ)
     }
 
-    fun getDataWatcher(value: Byte): DataWatcher.Item<Byte> {
+    fun getDataWatcherItem(value: Byte): DataWatcher.Item<Byte> {
         return DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.BYTE), value)
     }
 
-    fun getDataWatcher(value: Int): DataWatcher.Item<Int> {
+    fun getDataWatcherItem(value: Int): DataWatcher.Item<Int> {
         return DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.INT), value)
     }
 
-    fun getDataWatcher(value: Float): DataWatcher.Item<Float> {
+    fun getDataWatcherItem(value: Float): DataWatcher.Item<Float> {
         return DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.FLOAT), value)
     }
 
-    fun getDataWatcher(value: String): DataWatcher.Item<String> {
+    fun getDataWatcherItem(value: String): DataWatcher.Item<String> {
         return DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.STRING), value)
     }
 
-    fun getDataWatcher(value: IChatBaseComponent): DataWatcher.Item<IChatBaseComponent> {
+    fun getDataWatcherItem(value: IChatBaseComponent): DataWatcher.Item<IChatBaseComponent> {
         return DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.COMPONENT), value)
     }
 
@@ -856,100 +1166,87 @@ internal class NMS17 : NMSOut {
     fun getOptionalDataWatcher(value: Optional<*>): DataWatcher.Item<out Optional<*>> {
         return when (value.getOrNull()) {
             is IChatBaseComponent -> DataWatcher.Item(
-                DataWatcher.a(
-                    Entity::class.java,
-                    DataWatcherRegistry.OPTIONAL_COMPONENT
-                ), value as Optional<IChatBaseComponent>
+                DataWatcher.a(Entity::class.java, DataWatcherRegistry.OPTIONAL_COMPONENT),
+                value as Optional<IChatBaseComponent>
             )
 
-            is IBlockData -> DataWatcher.Item(
-                DataWatcher.a(Entity::class.java, DataWatcherRegistry.BLOCK_STATE),
-                value as Optional<IBlockData>
-            )
+            is IBlockData -> DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.BLOCK_STATE), value as Optional<IBlockData>)
 
-            is BlockPosition -> DataWatcher.Item(
-                DataWatcher.a(
-                    Entity::class.java,
-                    DataWatcherRegistry.OPTIONAL_BLOCK_POS
-                ), value as Optional<BlockPosition>
-            )
+            is BlockPosition -> DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.OPTIONAL_BLOCK_POS), value as Optional<BlockPosition>)
 
-            is UUID -> DataWatcher.Item(
-                DataWatcher.a(Entity::class.java, DataWatcherRegistry.OPTIONAL_UUID),
-                value as Optional<UUID>
-            )
+            is UUID -> DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.OPTIONAL_UUID), value as Optional<UUID>)
 
             else -> error("不支持的类型: $value")
         }
     }
 
-    fun getDataWatcher(value: ItemStack): DataWatcher.Item<ItemStack> {
+    fun getDataWatcherItem(value: ItemStack): DataWatcher.Item<ItemStack> {
         return DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.ITEM_STACK), value)
     }
 
-    fun getDataWatcher(value: Boolean): DataWatcher.Item<Boolean> {
+    fun getDataWatcherItem(value: Boolean): DataWatcher.Item<Boolean> {
         return DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.BOOLEAN), value)
     }
 
-    fun getDataWatcher(value: ParticleParam): DataWatcher.Item<ParticleParam> {
+    fun getDataWatcherItem(value: ParticleParam): DataWatcher.Item<ParticleParam> {
         return DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.PARTICLE), value)
     }
 
-    fun getDataWatcher(value: Vector3f): DataWatcher.Item<Vector3f> {
+    fun getDataWatcherItem(value: Vector3f): DataWatcher.Item<Vector3f> {
         return DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.ROTATIONS), value)
     }
 
-    fun getDataWatcher(value: BlockPosition): DataWatcher.Item<BlockPosition> {
+    fun getDataWatcherItem(value: BlockPosition): DataWatcher.Item<BlockPosition> {
         return DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.BLOCK_POS), value)
     }
 
-    fun getDataWatcher(value: EnumDirection): DataWatcher.Item<EnumDirection> {
+    fun getDataWatcherItem(value: EnumDirection): DataWatcher.Item<EnumDirection> {
         return DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.DIRECTION), value)
     }
 
-    fun getDataWatcher(value: NBTTagCompound): DataWatcher.Item<NBTTagCompound> {
+    fun getDataWatcherItem(value: NBTTagCompound): DataWatcher.Item<NBTTagCompound> {
         return DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.COMPOUND_TAG), value)
     }
 
-    fun getDataWatcher(value: VillagerData): DataWatcher.Item<VillagerData> {
+    fun getDataWatcherItem(value: VillagerData): DataWatcher.Item<VillagerData> {
         return DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.VILLAGER_DATA), value)
     }
 
-    fun getDataWatcher(value: OptionalInt): DataWatcher.Item<OptionalInt> {
+    fun getDataWatcherItem(value: OptionalInt): DataWatcher.Item<OptionalInt> {
         return DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.OPTIONAL_UNSIGNED_INT), value)
     }
 
-    fun getDataWatcher(value: EntityPose): DataWatcher.Item<EntityPose> {
+    fun getDataWatcherItem(value: EntityPose): DataWatcher.Item<EntityPose> {
         return DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.POSE), value)
     }
 
     @Suppress("UNCHECKED_CAST")
-    fun getDataWatcher(value: Any): DataWatcher.Item<*> {
+    fun getDataWatcherItem(value: Any): DataWatcher.Item<*> {
         if (value is DataWatcher.Item<*>) return value
         if (require(EntityPose::class.java) && value is EntityPose) {
-            return getDataWatcher(value)
+            return getDataWatcherItem(value)
         }
         if (require(VillagerData::class.java) && value is VillagerData) {
-            return getDataWatcher(value)
+            return getDataWatcherItem(value)
         }
         if (require(ParticleParam::class.java) && value is ParticleParam) {
-            return getDataWatcher(value)
+            return getDataWatcherItem(value)
         }
         return when (value) {
-            is String -> getDataWatcher(value)
-            is Byte -> getDataWatcher(value)
-            is Float -> getDataWatcher(value)
-            is NBTTagCompound -> getDataWatcher(value)
-            is OptionalInt -> getDataWatcher(value)
+            is String -> getDataWatcherItem(value)
+            is Byte -> getDataWatcherItem(value)
+            is Float -> getDataWatcherItem(value)
+            is NBTTagCompound -> getDataWatcherItem(value)
+            is OptionalInt -> getDataWatcherItem(value)
             is Optional<*> -> getOptionalDataWatcher(value)
-            is EnumDirection -> getDataWatcher(value)
-            is BlockPosition -> getDataWatcher(value)
-            is Vector3f -> getDataWatcher(value)
-            is Boolean -> getDataWatcher(value)
-            is IChatBaseComponent -> getDataWatcher(value)
-            is ItemStack -> getDataWatcher(value)
-            is Int -> getDataWatcher(value)
-            is org.bukkit.inventory.ItemStack -> getDataWatcher(toNMSItem(value))
+            is EnumDirection -> getDataWatcherItem(value)
+            is BlockPosition -> getDataWatcherItem(value)
+            is Vector3f -> getDataWatcherItem(value)
+            is Boolean -> getDataWatcherItem(value)
+            is IChatBaseComponent -> getDataWatcherItem(value)
+            is ItemStack -> getDataWatcherItem(value)
+            is Int -> getDataWatcherItem(value)
+            is org.bukkit.inventory.ItemStack -> getDataWatcherItem(toNMSItem(value))
             else -> error("不支持的类型: $value")
         }
     }

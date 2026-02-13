@@ -23,7 +23,9 @@ import org.bukkit.craftbukkit.v1_16_R3.inventory.CraftItemStack
 import org.bukkit.craftbukkit.v1_16_R3.util.CraftChatMessage
 import org.bukkit.entity.EntityType
 import org.bukkit.util.Vector
-import org.craft.packetfactory.MapData
+import org.craft.packetfactory.data.MapData
+import org.craft.packetfactory.data.PacketData
+import org.craft.packetfactory.data.PlayerData
 import taboolib.common.platform.function.pluginId
 import taboolib.library.reflex.Reflex.Companion.getProperty
 import taboolib.library.reflex.Reflex.Companion.invokeConstructor
@@ -103,10 +105,16 @@ internal class NMSOutImpl : NMSOut {
 
     override fun createTeleportPosition(data: PacketData): Any {
         val entityId = data.read<Int>("entityId")
-        val yaw = mathRot(data.read<Float>("yaw")).toByte()
+        val location = data.read<Location>("location")
+        val onGround =  data.readOrElse("onGround", false)
         return PacketPlayOutEntityTeleport().also {
             it.setProperty("a", entityId)
-            it.setProperty("b", yaw)
+            it.setProperty("b", location.x)
+            it.setProperty("c", location.y)
+            it.setProperty("d",location.z)
+            it.setProperty("e",mathRot(location.pitch))
+            it.setProperty("f",mathRot(location.yaw))
+            it.setProperty("g",onGround)
         }
     }
 
@@ -114,7 +122,7 @@ internal class NMSOutImpl : NMSOut {
         val entityId = data.readOrElse("entityId", 0)
         return PacketPlayOutEntityHeadRotation().also {
             it.setProperty("a", entityId)
-            it.setProperty("b", mathRot(data.read<Float>("yaw")).toByte())
+            it.setProperty("b", mathRot(data.read("yaw")).toByte())
         }
     }
 
@@ -149,8 +157,8 @@ internal class NMSOutImpl : NMSOut {
 
     override fun createEntityLook(data: PacketData): Any {
         val entityId = data.read<Int>("entityId")
-        val yaw = mathRot(data.read<Float>("yaw")).toByte()
-        val pitch = mathRot(data.read<Float>("pitch")).toByte()
+        val yaw = mathRot(data.read("yaw")).toByte()
+        val pitch = mathRot(data.read("pitch")).toByte()
         val onGround = data.readOrElse("onGround", false)
         return PacketPlayOutEntity.PacketPlayOutEntityLook(entityId, yaw, pitch, onGround)
     }
@@ -395,7 +403,7 @@ internal class NMSOutImpl : NMSOut {
     }
 
     override fun createPlayerChat(data: PacketData): Any {
-        val text = component(data.read<String>("text"))
+        val text = component(data.read("text"))
         val type = data.readEnumOrElse(ChatMessageType::class.java, "type", ChatMessageType.SYSTEM)
         val uuid = data.read<UUID>("uuid")
         return PacketPlayOutChat(text, type, uuid)
@@ -420,7 +428,7 @@ internal class NMSOutImpl : NMSOut {
     override fun createPlayerCombatKill(data: PacketData): Any {
         val attack = data.read<Int>("entityId")
         val entity = data.readOrElse("entity", -1)
-        val text = component(data.read<String>("text"))
+        val text = component(data.read("text"))
         return PacketPlayOutCombatEvent().also {
             it.setProperty("a", PacketPlayOutCombatEvent.EnumCombatEventType.ENTITY_DIED)
             it.setProperty("b", attack)
@@ -491,7 +499,7 @@ internal class NMSOutImpl : NMSOut {
     }
 
     override fun createSetActionBarText(data: PacketData): Any {
-        val text = component(data.read<String>("text"))
+        val text = component(data.read("text"))
         val uuid = data.read<UUID>("uuid")
         return PacketPlayOutChat(text, ChatMessageType.GAME_INFO, uuid)
     }
@@ -1212,23 +1220,23 @@ internal class NMSOutImpl : NMSOut {
         return BlockPosition(blockX, blockY, blockZ)
     }
 
-    fun getDataWatcher(value: Byte): DataWatcher.Item<Byte> {
+    fun getDataWatcherItem(value: Byte): DataWatcher.Item<Byte> {
         return DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.a), value)
     }
 
-    fun getDataWatcher(value: Int): DataWatcher.Item<Int> {
+    fun getDataWatcherItem(value: Int): DataWatcher.Item<Int> {
         return DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.b), value)
     }
 
-    fun getDataWatcher(value: Float): DataWatcher.Item<Float> {
+    fun getDataWatcherItem(value: Float): DataWatcher.Item<Float> {
         return DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.c), value)
     }
 
-    fun getDataWatcher(value: String): DataWatcher.Item<String> {
+    fun getDataWatcherItem(value: String): DataWatcher.Item<String> {
         return DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.d), value)
     }
 
-    fun getDataWatcher(value: IChatBaseComponent): DataWatcher.Item<IChatBaseComponent> {
+    fun getDataWatcherItem(value: IChatBaseComponent): DataWatcher.Item<IChatBaseComponent> {
         return DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.e), value)
     }
 
@@ -1259,11 +1267,11 @@ internal class NMSOutImpl : NMSOut {
         }
     }
 
-    fun getDataWatcher(value: ItemStack): DataWatcher.Item<ItemStack> {
+    fun getDataWatcherItem(value: ItemStack): DataWatcher.Item<ItemStack> {
         return DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.g), value)
     }
 
-    fun getDataWatcher(value: Boolean): DataWatcher.Item<Boolean> {
+    fun getDataWatcherItem(value: Boolean): DataWatcher.Item<Boolean> {
         return if (MinecraftVersion.versionId >= 11605) {
             DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.i), value)
         } else {
@@ -1276,65 +1284,65 @@ internal class NMSOutImpl : NMSOut {
         }
     }
 
-    fun getDataWatcher(value: ParticleParam): DataWatcher.Item<ParticleParam> {
+    fun getDataWatcherItem(value: ParticleParam): DataWatcher.Item<ParticleParam> {
         return DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.j), value)
     }
 
-    fun getDataWatcher(value: Vector3f): DataWatcher.Item<Vector3f> {
+    fun getDataWatcherItem(value: Vector3f): DataWatcher.Item<Vector3f> {
         return DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.k), value)
     }
 
-    fun getDataWatcher(value: BlockPosition): DataWatcher.Item<BlockPosition> {
+    fun getDataWatcherItem(value: BlockPosition): DataWatcher.Item<BlockPosition> {
         return DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.l), value)
     }
 
-    fun getDataWatcher(value: EnumDirection): DataWatcher.Item<EnumDirection> {
+    fun getDataWatcherItem(value: EnumDirection): DataWatcher.Item<EnumDirection> {
         return DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.n), value)
     }
 
-    fun getDataWatcher(value: NBTTagCompound): DataWatcher.Item<NBTTagCompound> {
+    fun getDataWatcherItem(value: NBTTagCompound): DataWatcher.Item<NBTTagCompound> {
         return DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.p), value)
     }
 
-    fun getDataWatcher(value: VillagerData): DataWatcher.Item<VillagerData> {
+    fun getDataWatcherItem(value: VillagerData): DataWatcher.Item<VillagerData> {
         return DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.q), value)
     }
 
-    fun getDataWatcher(value: OptionalInt): DataWatcher.Item<OptionalInt> {
+    fun getDataWatcherItem(value: OptionalInt): DataWatcher.Item<OptionalInt> {
         return DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.r), value)
     }
 
-    fun getDataWatcher(value: EntityPose): DataWatcher.Item<EntityPose> {
+    fun getDataWatcherItem(value: EntityPose): DataWatcher.Item<EntityPose> {
         return DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.s), value)
     }
 
     @Suppress("UNCHECKED_CAST")
-    fun getDataWatcher(value: Any): DataWatcher.Item<*> {
+    fun getDataWatcherItem(value: Any): DataWatcher.Item<*> {
         if (value is DataWatcher.Item<*>) return value
         if (require(EntityPose::class.java) && value is EntityPose) {
-            return getDataWatcher(value)
+            return getDataWatcherItem(value)
         }
         if (require(VillagerData::class.java) && value is VillagerData) {
-            return getDataWatcher(value)
+            return getDataWatcherItem(value)
         }
         if (require(ParticleParam::class.java) && value is ParticleParam) {
-            return getDataWatcher(value)
+            return getDataWatcherItem(value)
         }
         return when (value) {
-            is String -> getDataWatcher(value)
-            is Byte -> getDataWatcher(value)
-            is Float -> getDataWatcher(value)
-            is NBTTagCompound -> getDataWatcher(value)
-            is OptionalInt -> getDataWatcher(value)
+            is String -> getDataWatcherItem(value)
+            is Byte -> getDataWatcherItem(value)
+            is Float -> getDataWatcherItem(value)
+            is NBTTagCompound -> getDataWatcherItem(value)
+            is OptionalInt -> getDataWatcherItem(value)
             is Optional<*> -> getOptionalDataWatcher(value)
-            is EnumDirection -> getDataWatcher(value)
-            is BlockPosition -> getDataWatcher(value)
-            is Vector3f -> getDataWatcher(value)
-            is Boolean -> getDataWatcher(value)
-            is IChatBaseComponent -> getDataWatcher(value)
-            is ItemStack -> getDataWatcher(value)
-            is Int -> getDataWatcher(value)
-            is org.bukkit.inventory.ItemStack -> getDataWatcher(toNMSItem(value))
+            is EnumDirection -> getDataWatcherItem(value)
+            is BlockPosition -> getDataWatcherItem(value)
+            is Vector3f -> getDataWatcherItem(value)
+            is Boolean -> getDataWatcherItem(value)
+            is IChatBaseComponent -> getDataWatcherItem(value)
+            is ItemStack -> getDataWatcherItem(value)
+            is Int -> getDataWatcherItem(value)
+            is org.bukkit.inventory.ItemStack -> getDataWatcherItem(toNMSItem(value))
             else -> error("不支持的类型: $value")
         }
     }

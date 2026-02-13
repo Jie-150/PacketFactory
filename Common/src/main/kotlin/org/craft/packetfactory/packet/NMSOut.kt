@@ -2,6 +2,7 @@ package org.craft.packetfactory.packet
 
 import org.bukkit.Location
 import org.bukkit.entity.EntityType
+import org.craft.packetfactory.data.PacketData
 import taboolib.common.UnsupportedVersionException
 import taboolib.module.nms.MinecraftVersion
 
@@ -23,7 +24,6 @@ interface NMSOut {
             "HOPPER_MINECART",
             "TNT_MINECART",
             "SPAWNER_MINECART" -> yaw + 90
-
             else -> yaw
         }
     }

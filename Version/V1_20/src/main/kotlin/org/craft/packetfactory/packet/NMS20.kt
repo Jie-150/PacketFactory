@@ -25,6 +25,7 @@ import org.bukkit.craftbukkit.v1_20_R1.CraftParticle
 import org.bukkit.craftbukkit.v1_20_R1.inventory.CraftItemStack
 import org.bukkit.entity.EntityType
 import org.bukkit.util.Vector
+import org.craft.packetfactory.data.PacketData
 import taboolib.library.reflex.Reflex.Companion.setProperty
 import taboolib.library.reflex.Reflex.Companion.unsafeInstance
 import taboolib.module.nms.MinecraftVersion
@@ -814,23 +815,23 @@ internal class NMS20 : NMSOut {
         return BlockPosition(blockX, blockY, blockZ)
     }
 
-    fun getDataWatcher(value: Byte): DataWatcher.Item<Byte> {
+    fun getDataWatcherItem(value: Byte): DataWatcher.Item<Byte> {
         return DataWatcher.Item(DataWatcher.defineId(Entity::class.java, DataWatcherRegistry.BYTE), value)
     }
 
-    fun getDataWatcher(value: Int): DataWatcher.Item<Int> {
+    fun getDataWatcherItem(value: Int): DataWatcher.Item<Int> {
         return DataWatcher.Item(DataWatcher.defineId(Entity::class.java, DataWatcherRegistry.INT), value)
     }
 
-    fun getDataWatcher(value: Float): DataWatcher.Item<Float> {
+    fun getDataWatcherItem(value: Float): DataWatcher.Item<Float> {
         return DataWatcher.Item(DataWatcher.defineId(Entity::class.java, DataWatcherRegistry.FLOAT), value)
     }
 
-    fun getDataWatcher(value: String): DataWatcher.Item<String> {
+    fun getDataWatcherItem(value: String): DataWatcher.Item<String> {
         return DataWatcher.Item(DataWatcher.defineId(Entity::class.java, DataWatcherRegistry.STRING), value)
     }
 
-    fun getDataWatcher(value: IChatBaseComponent): DataWatcher.Item<IChatBaseComponent> {
+    fun getDataWatcherItem(value: IChatBaseComponent): DataWatcher.Item<IChatBaseComponent> {
         return DataWatcher.Item(DataWatcher.defineId(Entity::class.java, DataWatcherRegistry.COMPONENT), value)
     }
 
@@ -853,74 +854,74 @@ internal class NMS20 : NMSOut {
         }
     }
 
-    fun getDataWatcher(value: ItemStack): DataWatcher.Item<ItemStack> {
+    fun getDataWatcherItem(value: ItemStack): DataWatcher.Item<ItemStack> {
         return DataWatcher.Item(DataWatcher.defineId(Entity::class.java, DataWatcherRegistry.ITEM_STACK), value)
     }
 
-    fun getDataWatcher(value: Boolean): DataWatcher.Item<Boolean> {
+    fun getDataWatcherItem(value: Boolean): DataWatcher.Item<Boolean> {
         return DataWatcher.Item(DataWatcher.defineId(Entity::class.java, DataWatcherRegistry.BOOLEAN), value)
     }
 
-    fun getDataWatcher(value: ParticleParam): DataWatcher.Item<ParticleParam> {
+    fun getDataWatcherItem(value: ParticleParam): DataWatcher.Item<ParticleParam> {
         return DataWatcher.Item(DataWatcher.defineId(Entity::class.java, DataWatcherRegistry.PARTICLE), value)
     }
 
-    fun getDataWatcher(value: Vector3f): DataWatcher.Item<Vector3f> {
+    fun getDataWatcherItem(value: Vector3f): DataWatcher.Item<Vector3f> {
         return DataWatcher.Item(DataWatcher.defineId(Entity::class.java, DataWatcherRegistry.ROTATIONS), value)
     }
 
-    fun getDataWatcher(value: BlockPosition): DataWatcher.Item<BlockPosition> {
+    fun getDataWatcherItem(value: BlockPosition): DataWatcher.Item<BlockPosition> {
         return DataWatcher.Item(DataWatcher.defineId(Entity::class.java, DataWatcherRegistry.BLOCK_POS), value)
     }
 
-    fun getDataWatcher(value: EnumDirection): DataWatcher.Item<EnumDirection> {
+    fun getDataWatcherItem(value: EnumDirection): DataWatcher.Item<EnumDirection> {
         return DataWatcher.Item(DataWatcher.defineId(Entity::class.java, DataWatcherRegistry.DIRECTION), value)
     }
 
-    fun getDataWatcher(value: NBTTagCompound): DataWatcher.Item<NBTTagCompound> {
+    fun getDataWatcherItem(value: NBTTagCompound): DataWatcher.Item<NBTTagCompound> {
         return DataWatcher.Item(DataWatcher.defineId(Entity::class.java, DataWatcherRegistry.COMPOUND_TAG), value)
     }
 
-    fun getDataWatcher(value: VillagerData): DataWatcher.Item<VillagerData> {
+    fun getDataWatcherItem(value: VillagerData): DataWatcher.Item<VillagerData> {
         return DataWatcher.Item(DataWatcher.defineId(Entity::class.java, DataWatcherRegistry.VILLAGER_DATA), value)
     }
 
-    fun getDataWatcher(value: OptionalInt): DataWatcher.Item<OptionalInt> {
+    fun getDataWatcherItem(value: OptionalInt): DataWatcher.Item<OptionalInt> {
         return DataWatcher.Item(DataWatcher.defineId(Entity::class.java, DataWatcherRegistry.OPTIONAL_UNSIGNED_INT), value)
     }
 
-    fun getDataWatcher(value: EntityPose): DataWatcher.Item<EntityPose> {
+    fun getDataWatcherItem(value: EntityPose): DataWatcher.Item<EntityPose> {
         return DataWatcher.Item(DataWatcher.defineId(Entity::class.java, DataWatcherRegistry.POSE), value)
     }
 
     @Suppress("UNCHECKED_CAST")
-    fun getDataWatcher(value: Any): DataWatcher.Item<*> {
+    fun getDataWatcherItem(value: Any): DataWatcher.Item<*> {
         if (value is DataWatcher.Item<*>) return value
         if (require(EntityPose::class.java) && value is EntityPose) {
-            return getDataWatcher(value)
+            return getDataWatcherItem(value)
         }
         if (require(VillagerData::class.java) && value is VillagerData) {
-            return getDataWatcher(value)
+            return getDataWatcherItem(value)
         }
         if (require(ParticleParam::class.java) && value is ParticleParam) {
-            return getDataWatcher(value)
+            return getDataWatcherItem(value)
         }
         return when (value) {
             is IBlockData -> DataWatcher.Item(DataWatcher.defineId(Entity::class.java, DataWatcherRegistry.BLOCK_STATE), value)
-            is String -> getDataWatcher(value)
-            is Byte -> getDataWatcher(value)
-            is Float -> getDataWatcher(value)
-            is NBTTagCompound -> getDataWatcher(value)
-            is OptionalInt -> getDataWatcher(value)
+            is String -> getDataWatcherItem(value)
+            is Byte -> getDataWatcherItem(value)
+            is Float -> getDataWatcherItem(value)
+            is NBTTagCompound -> getDataWatcherItem(value)
+            is OptionalInt -> getDataWatcherItem(value)
             is Optional<*> -> getOptionalDataWatcher(value)
-            is EnumDirection -> getDataWatcher(value)
-            is BlockPosition -> getDataWatcher(value)
-            is Vector3f -> getDataWatcher(value)
-            is Boolean -> getDataWatcher(value)
-            is IChatBaseComponent -> getDataWatcher(value)
-            is ItemStack -> getDataWatcher(value)
-            is Int -> getDataWatcher(value)
-            is org.bukkit.inventory.ItemStack -> getDataWatcher(toNMSItem(value))
+            is EnumDirection -> getDataWatcherItem(value)
+            is BlockPosition -> getDataWatcherItem(value)
+            is Vector3f -> getDataWatcherItem(value)
+            is Boolean -> getDataWatcherItem(value)
+            is IChatBaseComponent -> getDataWatcherItem(value)
+            is ItemStack -> getDataWatcherItem(value)
+            is Int -> getDataWatcherItem(value)
+            is org.bukkit.inventory.ItemStack -> getDataWatcherItem(toNMSItem(value))
             else -> error("不支持的类型: $value")
         }
     }

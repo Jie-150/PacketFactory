@@ -1,4 +1,4 @@
-package org.craft.packetfactory
+package org.craft.packetfactory.data
 
 class MapData {
     var type: String = "PLAYER"

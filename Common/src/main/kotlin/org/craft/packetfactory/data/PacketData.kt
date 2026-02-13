@@ -1,22 +1,6 @@
-package org.craft.packetfactory.packet
+package org.craft.packetfactory.data
 
 import com.google.common.base.Enums
-import org.bukkit.Location
-import org.bukkit.Particle
-import org.bukkit.World
-import org.bukkit.entity.EntityType
-import org.bukkit.inventory.ItemStack
-import org.bukkit.util.Vector
-import org.craft.packetfactory.packet.type.MessageType
-import taboolib.common5.cbool
-import taboolib.common5.cbyte
-import taboolib.common5.cdouble
-import taboolib.common5.cfloat
-import taboolib.common5.cint
-import taboolib.common5.clong
-import taboolib.common5.cshort
-import java.util.UUID
-import kotlin.jvm.java
 
 @Suppress("UNCHECKED_CAST")
 class PacketData {
@@ -54,10 +38,11 @@ class PacketData {
         return (mapData[key] ?: default) as T
     }
 
-    fun <T> readNotNull(key: String, callback: (T) -> Unit) {
+    fun <T> readNotNull(key: String, callback: (T) -> Unit): PacketData {
         if (contains(key)) {
             callback(mapData[key] as T)
         }
+        return this
     }
 
     fun <T : Enum<T>> readEnum(clazz: Class<T>, key: String): T {
