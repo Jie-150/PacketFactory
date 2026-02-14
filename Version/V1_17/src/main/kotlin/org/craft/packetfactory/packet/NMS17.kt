@@ -604,20 +604,19 @@ internal class NMS17 : NMSOut {
     }
 
     override fun createAbilities(data: PacketData): Any {
-        val abilities = PlayerAbilities()
-        data.readNotNull<Boolean>("invulnerable") {
-            abilities.invulnerable = it
+        val abilities =  data.bind(PlayerAbilities()).readNotNull<Boolean>("invulnerable") {
+            invulnerable = it
         }.readNotNull<Boolean>("isFlying") {
-            abilities.flying = it
+            flying = it
         }.readNotNull<Boolean>("canFly") {
-            abilities.mayfly = it
+            mayfly = it
         }.readNotNull<Boolean>("instabuild") {
-            abilities.instabuild = it
+            instabuild = it
         }.readNotNull<Float>("flyingSpeed") {
-            abilities.flyingSpeed = it
+            flyingSpeed = it
         }.readNotNull<Float>("walkingSpeed") {
-            abilities.walkingSpeed = it
-        }
+            walkingSpeed = it
+        }.get()
         return PacketPlayOutAbilities(abilities)
     }
 
@@ -653,20 +652,20 @@ internal class NMS17 : NMSOut {
         val boss = BossBattleCustom(MinecraftKey(pluginId, "bossbar"), component(data.read("text")))
         return when (data.read<String>("action")) {
             "add" -> {
-                data.readNotNull<String>("name") {
-                    boss.name = component(it)
+                data.bind(boss).readNotNull<String>("name") {
+                    name = component(it)
                 }.readNotNull<Float>("progress") {
-                    boss.progress = it
+                    progress = it
                 }.readNotNull<String>("color") {
-                    boss.color = BossBattle.BarColor.valueOf(it.uppercase())
+                    color = BossBattle.BarColor.valueOf(it.uppercase())
                 }.readNotNull<String>("style") {
-                    boss.overlay = BossBattle.BarStyle.valueOf(it.uppercase())
+                    overlay = BossBattle.BarStyle.valueOf(it.uppercase())
                 }.readNotNull<Boolean>("darkenScreen") {
-                    boss.isDarkenSky = it
+                    isDarkenSky = it
                 }.readNotNull<Boolean>("playMusic") {
-                    boss.isPlayMusic = it
+                    isPlayMusic = it
                 }.readNotNull<Boolean>("createWorldFog") {
-                    boss.isCreateFog = it
+                    isCreateFog = it
                 }
                 PacketPlayOutBoss.createAddPacket(boss)
             }
@@ -676,35 +675,35 @@ internal class NMS17 : NMSOut {
             }
 
             "progress" -> {
-                data.readNotNull<Float>("progress") {
-                    boss.progress = it
+                data.bind(boss).readNotNull<Float>("progress") {
+                    progress = it
                 }
                 PacketPlayOutBoss.createUpdateProgressPacket(boss)
             }
 
             "name" -> {
-                data.readNotNull<String>("name") {
-                    boss.name = component(it)
+                data.bind(boss).readNotNull<String>("name") {
+                    name = component(it)
                 }
                 PacketPlayOutBoss.createUpdateNamePacket(boss)
             }
 
             "style" -> {
-                data.readNotNull<String>("color") {
-                    boss.color = BossBattle.BarColor.valueOf(it.uppercase())
+                data.bind(boss).readNotNull<String>("color") {
+                    color = BossBattle.BarColor.valueOf(it.uppercase())
                 }.readNotNull<String>("overlay") {
-                    boss.overlay = BossBattle.BarStyle.valueOf(it.uppercase())
+                    overlay = BossBattle.BarStyle.valueOf(it.uppercase())
                 }
                 PacketPlayOutBoss.createUpdateStylePacket(boss)
             }
 
             "properties" -> {
-                data.readNotNull<Boolean>("darkenSky") {
-                    boss.isDarkenSky = it
+                data.bind(boss).readNotNull<Boolean>("darkenSky") {
+                    isDarkenSky = it
                 }.readNotNull<Boolean>("playMusic") {
-                    boss.isPlayMusic = it
+                    isPlayMusic = it
                 }.readNotNull<Boolean>("createFog") {
-                    boss.isCreateFog = it
+                    isCreateFog = it
                 }
                 PacketPlayOutBoss.createUpdatePropertiesPacket(boss)
             }
@@ -929,13 +928,11 @@ internal class NMS17 : NMSOut {
 
     override fun createScoreboardTeam(data: PacketData): Any {
         val uniqueName = data.read<String>("name")
-        val team = ScoreboardTeam(Scoreboard(), uniqueName)
-        data.readNotNull<String>("prefix") {
-            team.prefix = component(it)
-        }
-        data.readNotNull<String>("suffix") {
-            team.suffix = component(it)
-        }
+        val team = data.bind(ScoreboardTeam(Scoreboard(), uniqueName)).readNotNull<String>("prefix") {
+            prefix = component(it)
+        }.readNotNull<String>("suffix") {
+            suffix = component(it)
+        }.get()
         val mode = data.read<Int>("mode")
         val players = data.read<List<String>>("players")
         return PacketPlayOutScoreboardTeam::class.java.invokeConstructor(uniqueName, mode, Optional.of(PacketPlayOutScoreboardTeam.a(team)), players)

@@ -106,15 +106,15 @@ internal class NMSOutImpl : NMSOut {
     override fun createTeleportPosition(data: PacketData): Any {
         val entityId = data.read<Int>("entityId")
         val location = data.read<Location>("location")
-        val onGround =  data.readOrElse("onGround", false)
+        val onGround = data.readOrElse("onGround", false)
         return PacketPlayOutEntityTeleport().also {
             it.setProperty("a", entityId)
             it.setProperty("b", location.x)
             it.setProperty("c", location.y)
-            it.setProperty("d",location.z)
-            it.setProperty("e",mathRot(location.pitch))
-            it.setProperty("f",mathRot(location.yaw))
-            it.setProperty("g",onGround)
+            it.setProperty("d", location.z)
+            it.setProperty("e", mathRot(location.pitch))
+            it.setProperty("f", mathRot(location.yaw))
+            it.setProperty("g", onGround)
         }
     }
 
@@ -596,19 +596,16 @@ internal class NMSOutImpl : NMSOut {
     }
 
     override fun createAbilities(data: PacketData): Any {
-        val abilities = PlayerAbilities()
-        data.readNotNull<Boolean>("isFlying") {
-            abilities.isFlying = it
-        }
-        data.readNotNull<Boolean>("canFly") {
-            abilities.canFly = it
-        }
-        data.readNotNull<Boolean>("isInvulnerable") {
-            abilities.isInvulnerable = it
-        }
-        data.readNotNull<Boolean>("mayBuild") {
-            abilities.mayBuild = it
-        }
+        val abilities = data.bind(PlayerAbilities())
+            .readNotNull<Boolean>("isFlying") {
+                isFlying = it
+            }.readNotNull<Boolean>("canFly") {
+                canFly = it
+            }.readNotNull<Boolean>("isInvulnerable") {
+                isInvulnerable = it
+            }.readNotNull<Boolean>("mayBuild") {
+                mayBuild = it
+            }.get()
         return PacketPlayOutAbilities(abilities)
     }
 
@@ -994,13 +991,11 @@ internal class NMSOutImpl : NMSOut {
 
     override fun createScoreboardTeam(data: PacketData): Any {
         val uniqueName = data.read<String>("name")
-        val team = ScoreboardTeam(Scoreboard(), uniqueName)
-        data.readNotNull<String>("prefix") {
-            team.prefix = component(it)
-        }
-        data.readNotNull<String>("suffix") {
-            team.suffix = component(it)
-        }
+        val team = data.bind(ScoreboardTeam(Scoreboard(), uniqueName)).readNotNull<String>("prefix") {
+            prefix = component(it)
+        }.readNotNull<String>("suffix") {
+            suffix = component(it)
+        }.get()
         val mode = data.read<Int>("mode")
         return PacketPlayOutScoreboardTeam(team, mode)
     }

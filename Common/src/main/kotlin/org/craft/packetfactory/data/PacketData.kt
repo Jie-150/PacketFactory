@@ -23,7 +23,7 @@ class PacketData {
     }
 
     fun <T> read(key: String): T {
-        return (mapData[key] ?: error("$key 不可为空"))as T
+        return (mapData[key] ?: error("$key 不可为空")) as T
     }
 
     fun readOrNull(key: String): Any? {
@@ -38,11 +38,8 @@ class PacketData {
         return (mapData[key] ?: default) as T
     }
 
-    fun <T> readNotNull(key: String, callback: (T) -> Unit): PacketData {
-        if (contains(key)) {
-            callback(mapData[key] as T)
-        }
-        return this
+    fun <T> bind(bind: T): DataHandle<T> {
+        return DataHandle(bind, mapData)
     }
 
     fun <T : Enum<T>> readEnum(clazz: Class<T>, key: String): T {
@@ -63,6 +60,18 @@ class PacketData {
 
     fun getSource(): Map<String, Any> {
         return HashMap(mapData)
+    }
+
+    class DataHandle<T>(val value: T, private val data: Map<String, Any>) {
+
+        fun <V> readNotNull(key: String, callback: T.(V) -> Unit): DataHandle<T> {
+            if (data.contains(key)) callback(value, data[key] as V)
+            return this
+        }
+
+        fun get(): T {
+            return value
+        }
     }
 
 }
