@@ -7,19 +7,26 @@ class PacketData {
 
     private val mapData = object : HashMap<String, Any>() {
         override fun put(key: String, value: Any): Any? {
+            if (contains(key)) {
+                error("$key 已存在,不可重复写入")
+            }
             return super.put(key, value)
+        }
+
+        override fun putAll(m: Map<out String, out Any>) {
+            if (m.any { keys.contains(it.key) }) {
+                error("无法写入重复数据 ${m.entries.first { keys.contains(it.key) }.key}")
+            }
+            super.putAll(m)
         }
     }
 
     fun write(key: String, value: Any) {
-        if (contains(key)) {
-            error("$key 已存在,不可重复写入")
-        }
         mapData[key] = value
     }
 
     fun write(data: Map<String, Any>) {
-        mapData.putAll(data.filter { mapData[it.key] == null })
+        mapData.putAll(data)
     }
 
     fun <T> read(key: String): T {
