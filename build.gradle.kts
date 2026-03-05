@@ -1,3 +1,4 @@
+import io.izzel.taboolib.gradle.BukkitNMSDataSerializer
 import io.izzel.taboolib.gradle.BukkitNMSUtil
 import io.izzel.taboolib.gradle.TabooLibExtension
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
@@ -7,7 +8,7 @@ plugins {
     `maven-publish`
     `java-library`
     kotlin("jvm") version "2.0.21" apply false
-    id("io.izzel.taboolib") version "2.0.27" apply false
+    id("io.izzel.taboolib") version "2.0.30" apply false
 }
 subprojects {
     apply<JavaPlugin>()
@@ -17,9 +18,9 @@ subprojects {
     configure<TabooLibExtension> {
         subproject = true
         env {
-            install(BukkitNMSUtil)
+            install(BukkitNMSUtil, BukkitNMSDataSerializer)
         }
-        version { taboolib = "6.2.4-e6c8347" }
+        version { taboolib = "6.2.4-a3e8abb" }
     }
     repositories {
         mavenLocal()

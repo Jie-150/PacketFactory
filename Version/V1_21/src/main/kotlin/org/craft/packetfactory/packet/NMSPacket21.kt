@@ -1,19 +1,17 @@
 package org.craft.packetfactory.packet
 
 import net.minecraft.core.BlockPosition
+import net.minecraft.core.IRegistryCustom
 import net.minecraft.core.NonNullList
-import net.minecraft.core.particles.ParticleParam
 import net.minecraft.core.registries.BuiltInRegistries
+import net.minecraft.network.PacketDataSerializer
 import net.minecraft.network.chat.IChatBaseComponent
+import net.minecraft.network.chat.numbers.BlankFormat
+import net.minecraft.network.chat.numbers.NumberFormat
 import net.minecraft.network.protocol.game.*
 import net.minecraft.network.syncher.DataWatcher
 import net.minecraft.network.syncher.DataWatcherRegistry
-import net.minecraft.resources.MinecraftKey
-import net.minecraft.world.entity.Entity
-import net.minecraft.world.entity.EntityPose
-import net.minecraft.world.entity.npc.VillagerData
 import net.minecraft.world.item.ItemStack
-import net.minecraft.world.level.block.state.IBlockData
 import net.minecraft.world.phys.Vec3D
 import org.bukkit.Location
 import org.bukkit.Material
@@ -21,14 +19,13 @@ import org.bukkit.Particle
 import org.bukkit.craftbukkit.v1_21_R1.CraftParticle
 import org.bukkit.craftbukkit.v1_21_R1.inventory.CraftItemStack
 import org.bukkit.util.Vector
+import org.craft.packetfactory.PacketFactory
 import org.craft.packetfactory.data.PacketData
-import taboolib.library.reflex.Reflex.Companion.setProperty
-import taboolib.library.reflex.Reflex.Companion.unsafeInstance
-import taboolib.module.nms.remap.require
+import taboolib.library.reflex.Reflex.Companion.invokeConstructor
+import taboolib.module.nms.createDataSerializer
 import java.util.*
-import kotlin.jvm.optionals.getOrNull
 
-internal class NMS21 : NMSOut {
+internal class NMSPacket21 : NMSPacket {
     /**
      * 创建实体生成网络数据包
      *
@@ -49,20 +46,10 @@ internal class NMS21 : NMSOut {
         val extraData = data.readOrElse("extraData", 0)
         val yHeadRot = data.readOrElse("yHeadRot", 0.0)
 
-        val type = BuiltInRegistries.ENTITY_TYPE[MinecraftKey.parse(entityType.name.lowercase())]
+        val type = BuiltInRegistries.ENTITY_TYPE.byId(entityType.typeId.toInt())
 
         return PacketPlayOutSpawnEntity(
-            entityId,
-            uuid,
-            location.x,
-            location.y,
-            location.z,
-            fixYaw(entityType, location.yaw),
-            location.pitch,
-            type,
-            extraData,
-            Vec3D.ZERO,
-            yHeadRot
+            entityId, uuid, location.x, location.y, location.z, fixYaw(entityType, location.yaw), location.pitch, type, extraData, Vec3D.ZERO, yHeadRot
         )
     }
 
@@ -70,78 +57,17 @@ internal class NMS21 : NMSOut {
         TODO("该版本不再使用该包生成实体,使用createSpawnEntity方法生成实体")
     }
 
-    /**
-     * 创建经验球生成网络数据包
-     *
-     * @param data 包含经验球生成信息的数据对象，需要包含以下字段：
-     *             - id: Int 经验球网络ID（必需）
-     *             - location: Location 世界生成坐标（必需）
-     *             - value: Int 经验点数（可选，默认0）
-     * @return PacketPlayOutSpawnEntityExperienceOrb 经验球生成S2C数据包
-     */
-    override fun createSpawnEntityExperienceOrb(data: PacketData): Any {
-        val id = data.read<Int>("id")
-        val location = data.read<Location>("location")
-        val value = data.readOrElse("value", 0)
-        return PacketPlayOutSpawnEntityExperienceOrb::class.java.unsafeInstance().also {
-            it.setProperty("id", id)
-            it.setProperty("x", location.x)
-            it.setProperty("y", location.y)
-            it.setProperty("z", location.z)
-            it.setProperty("value", value)
-        }
-    }
-
-    override fun createTeleportPosition(data: PacketData): Any {
-        TODO("Not yet implemented")
-    }
-
-    override fun createEntityHeadRotation(data: PacketData): Any {
-        TODO("Not yet implemented")
-    }
-
     override fun createEntityMetadata(data: PacketData): Any {
-        TODO("Not yet implemented")
-    }
-
-    override fun createEntityDestroy(data: PacketData): Any {
-        TODO("Not yet implemented")
-    }
-
-    override fun createRelEntityMove(data: PacketData): Any {
-        TODO("Not yet implemented")
-    }
-
-    override fun createEntityLook(data: PacketData): Any {
-        TODO("Not yet implemented")
-    }
-
-    override fun createRelEntityMoveLook(data: PacketData): Any {
-        TODO("Not yet implemented")
-    }
-
-    override fun createEntityEquipment(data: PacketData): Any {
-        TODO("Not yet implemented")
-    }
-
-    override fun createAnimation(data: PacketData): Any {
-        TODO("Not yet implemented")
-    }
-
-    override fun createAttachEntity(data: PacketData): Any {
-        TODO("Not yet implemented")
-    }
-
-    override fun createEntityVelocity(data: PacketData): Any {
-        TODO("Not yet implemented")
-    }
-
-    override fun createBed(data: PacketData): Any {
-        TODO("Not yet implemented")
-    }
-
-    override fun createClearDialog(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val metadata = data.read<Map<Int, Any>>("metadata").map {
+            PacketFactory.getDataWatcherItemAPI().getDataWatcherItem(it.key, it.value) as DataWatcher.Item<*>
+        }
+        return PacketPlayOutEntityMetadata::class.java.invokeConstructor(createDataSerializer {
+            writeInt(data.read("entityId"))
+            metadata.forEach {
+                writeInt(it.accessor.id)
+                writeVarInt(DataWatcherRegistry.getSerializedId(it.accessor.serializer))
+            }
+        }.build() as PacketDataSerializer)
     }
 
     override fun createKeepAlive(data: PacketData): Any {
@@ -472,18 +398,6 @@ internal class NMS21 : NMSOut {
         TODO("Not yet implemented")
     }
 
-    override fun createCamera(data: PacketData): Any {
-        TODO("Not yet implemented")
-    }
-
-    override fun createCloseWindow(data: PacketData): Any {
-        TODO("Not yet implemented")
-    }
-
-    override fun createCollect(data: PacketData): Any {
-        TODO("Not yet implemented")
-    }
-
     override fun createCommands(data: PacketData): Any {
         TODO("Not yet implemented")
     }
@@ -496,23 +410,11 @@ internal class NMS21 : NMSOut {
         TODO("Not yet implemented")
     }
 
-    override fun createEntityStatus(data: PacketData): Any {
-        TODO("Not yet implemented")
-    }
-
     override fun createExplosion(data: PacketData): Any {
         TODO("Not yet implemented")
     }
 
     override fun createGameStateChange(data: PacketData): Any {
-        TODO("Not yet implemented")
-    }
-
-    override fun createHeldItemSlot(data: PacketData): Any {
-        TODO("Not yet implemented")
-    }
-
-    override fun createLightUpdate(data: PacketData): Any {
         TODO("Not yet implemented")
     }
 
@@ -593,7 +495,11 @@ internal class NMS21 : NMSOut {
     }
 
     override fun createScoreboardScore(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val action = data.readOrElse("action", "")
+        val objectiveName = data.read<String>("objectiveName")
+        val score = data.readOrElse("score", 0)
+        val name = data.read<String>("name")
+        return PacketPlayOutScoreboardScore(action, objectiveName, score, Optional.of(component(name)), Optional.of(BlankFormat()))
     }
 
     override fun createScoreboardTeam(data: PacketData): Any {
@@ -752,30 +658,17 @@ internal class NMS21 : NMSOut {
         val type = CraftParticle.createParticleParam(data.read<Particle>("type"), null)
         val overrideLimiter = data.readOrElse("overrideLimiter", false)
         val location = data.read<Location>("location")
-            val vector = data.readOrElse("vector", Vector())
+        val vector = data.readOrElse("vector", Vector())
         val maxSpeed = data.readOrElse("maxSpeed", 1.0f)
         val count = data.readOrElse("count", 1)
 
         return PacketPlayOutWorldParticles(
-            type,
-            overrideLimiter,
-            location.x,
-            location.y,
-            location.z,
-            vector.x.toFloat(),
-            vector.y.toFloat(),
-            vector.z.toFloat(),
-            maxSpeed,
-            count
+            type, overrideLimiter, location.x, location.y, location.z, vector.x.toFloat(), vector.y.toFloat(), vector.z.toFloat(), maxSpeed, count
         )
     }
 
     override fun createNamedEntitySpawn(data: PacketData): Any {
         TODO("该版本没有该功能")
-    }
-
-    override fun createSpawnEntityPainting(data: PacketData): Any {
-        TODO("1.19+ 不再支持发Painting包")
     }
 
     private fun toNMSItem(itemStack: org.bukkit.inventory.ItemStack): ItemStack {
@@ -786,119 +679,12 @@ internal class NMS21 : NMSOut {
         return BlockPosition(blockX, blockY, blockZ)
     }
 
-    fun getDataWatcherItem(value: Byte): DataWatcher.Item<Byte> {
-        return DataWatcher.Item(DataWatcher.defineId(Entity::class.java, DataWatcherRegistry.BYTE), value)
-    }
-
-    fun getDataWatcherItem(value: Int): DataWatcher.Item<Int> {
-        return DataWatcher.Item(DataWatcher.defineId(Entity::class.java, DataWatcherRegistry.INT), value)
-    }
-
-    fun getDataWatcherItem(value: Float): DataWatcher.Item<Float> {
-        return DataWatcher.Item(DataWatcher.defineId(Entity::class.java, DataWatcherRegistry.FLOAT), value)
-    }
-
-    fun getDataWatcherItem(value: String): DataWatcher.Item<String> {
-        return DataWatcher.Item(DataWatcher.defineId(Entity::class.java, DataWatcherRegistry.STRING), value)
-    }
-
-    fun getDataWatcherItem(value: IChatBaseComponent): DataWatcher.Item<IChatBaseComponent> {
-        return DataWatcher.Item(DataWatcher.defineId(Entity::class.java, DataWatcherRegistry.COMPONENT), value)
-    }
-
-    @Suppress("UNCHECKED_CAST")
-    fun getOptionalDataWatcher(value: Optional<*>): DataWatcher.Item<out Optional<out Any?>?> {
-        return when (value.getOrNull()) {
-            is IChatBaseComponent -> DataWatcher.Item(
-                DataWatcher.defineId(Entity::class.java, DataWatcherRegistry.OPTIONAL_COMPONENT),
-                value as Optional<IChatBaseComponent>
-            )
-
-            is BlockPosition -> DataWatcher.Item(
-                DataWatcher.defineId(Entity::class.java, DataWatcherRegistry.OPTIONAL_BLOCK_POS),
-                value as Optional<BlockPosition>
-            )
-
-            is UUID ->
-                DataWatcher.Item(DataWatcher.defineId(Entity::class.java, DataWatcherRegistry.OPTIONAL_UUID), value as Optional<UUID>)
-
-            else -> error("不支持的类型: $value")
+    fun component(text: String): IChatBaseComponent {
+        return if (text.startsWith("{") && text.endsWith("}")) {
+            IChatBaseComponent.ChatSerializer.fromJson(text, IRegistryCustom.EMPTY)!!
+        } else {
+            IChatBaseComponent.literal(text)
         }
     }
 
-    fun getDataWatcherItem(value: ItemStack): DataWatcher.Item<ItemStack> {
-        return DataWatcher.Item(DataWatcher.defineId(Entity::class.java, DataWatcherRegistry.ITEM_STACK), value)
-    }
-
-    fun getDataWatcherItem(value: Boolean): DataWatcher.Item<Boolean> {
-        return DataWatcher.Item(DataWatcher.defineId(Entity::class.java, DataWatcherRegistry.BOOLEAN), value)
-    }
-
-    fun getDataWatcherItem(value: ParticleParam): DataWatcher.Item<ParticleParam> {
-        return DataWatcher.Item(DataWatcher.defineId(Entity::class.java, DataWatcherRegistry.PARTICLE), value)
-    }
-
-    fun getDataWatcherItem(value: net.minecraft.core.Vector3f): DataWatcher.Item<net.minecraft.core.Vector3f> {
-        return DataWatcher.Item(DataWatcher.defineId(Entity::class.java, DataWatcherRegistry.ROTATIONS), value)
-    }
-
-    fun getDataWatcherItem(value: BlockPosition): DataWatcher.Item<BlockPosition> {
-        return DataWatcher.Item(DataWatcher.defineId(Entity::class.java, DataWatcherRegistry.BLOCK_POS), value)
-    }
-
-    fun getDataWatcherItem(value: net.minecraft.core.EnumDirection): DataWatcher.Item<net.minecraft.core.EnumDirection> {
-        return DataWatcher.Item(DataWatcher.defineId(Entity::class.java, DataWatcherRegistry.DIRECTION), value)
-    }
-
-    fun getDataWatcherItem(value: net.minecraft.nbt.NBTTagCompound): DataWatcher.Item<net.minecraft.nbt.NBTTagCompound> {
-        return DataWatcher.Item(DataWatcher.defineId(Entity::class.java, DataWatcherRegistry.COMPOUND_TAG), value)
-    }
-
-    fun getDataWatcherItem(value: VillagerData): DataWatcher.Item<VillagerData> {
-        return DataWatcher.Item(DataWatcher.defineId(Entity::class.java, DataWatcherRegistry.VILLAGER_DATA), value)
-    }
-
-    fun getDataWatcherItem(value: OptionalInt): DataWatcher.Item<OptionalInt> {
-        return DataWatcher.Item(DataWatcher.defineId(Entity::class.java, DataWatcherRegistry.OPTIONAL_UNSIGNED_INT), value)
-    }
-
-    fun getDataWatcherItem(value: EntityPose): DataWatcher.Item<EntityPose> {
-        return DataWatcher.Item(DataWatcher.defineId(Entity::class.java, DataWatcherRegistry.POSE), value)
-    }
-
-    fun getDataWatcherItem(value: IBlockData): DataWatcher.Item<IBlockData> {
-        return DataWatcher.Item(DataWatcher.defineId(Entity::class.java, DataWatcherRegistry.BLOCK_STATE), value)
-    }
-
-    @Suppress("UNCHECKED_CAST")
-    fun getDataWatcherItem(value: Any): DataWatcher.Item<*> {
-        if (value is DataWatcher.Item<*>) return value
-        if (require(EntityPose::class.java) && value is EntityPose) {
-            return getDataWatcherItem(value)
-        }
-        if (require(VillagerData::class.java) && value is VillagerData) {
-            return getDataWatcherItem(value)
-        }
-        if (require(ParticleParam::class.java) && value is ParticleParam) {
-            return getDataWatcherItem(value)
-        }
-        return when (value) {
-            is IBlockData -> getDataWatcherItem(value)
-            is String -> getDataWatcherItem(value)
-            is Byte -> getDataWatcherItem(value)
-            is Float -> getDataWatcherItem(value)
-            is net.minecraft.nbt.NBTTagCompound -> getDataWatcherItem(value)
-            is OptionalInt -> getDataWatcherItem(value)
-            is Optional<*> -> getOptionalDataWatcher(value)
-            is net.minecraft.core.EnumDirection -> getDataWatcherItem(value)
-            is BlockPosition -> getDataWatcherItem(value)
-            is net.minecraft.core.Vector3f -> getDataWatcherItem(value)
-            is Boolean -> getDataWatcherItem(value)
-            is IChatBaseComponent -> getDataWatcherItem(value)
-            is ItemStack -> getDataWatcherItem(value)
-            is Int -> getDataWatcherItem(value)
-            is org.bukkit.inventory.ItemStack -> getDataWatcherItem(toNMSItem(value))
-            else -> error("不支持的类型: $value")
-        }
-    }
 }

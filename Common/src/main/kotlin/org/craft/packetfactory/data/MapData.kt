@@ -9,7 +9,7 @@ class MapData {
 
     var rotation: Byte = 0
         set(value) {
-            if (field !in 0..15) {
+            if (value !in 0..15) {
                 throw IllegalArgumentException("参数不正确,应该在0~15以内")
             }
             field = value

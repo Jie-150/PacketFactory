@@ -25,9 +25,6 @@ tasks {
         // 打包子项目源代码
         rootProject.subprojects.forEach { from(it.sourceSets["main"].allSource) }
     }
-    jar {
-//        destinationDirectory.set(file("H:/1.18.1/plugins"))
-    }
 }
 
 publishing {
@@ -45,17 +42,10 @@ publishing {
         }
     }
     publications {
-        // API 发布配置
-        create<MavenPublication>("api") {
-            groupId = "org.craft.packetfactory"
-            artifactId = "api"
-            // 使用 taboolibBuildApi 任务的输出
-            artifact("${project.buildDir}/libs/${rootProject.name}-${rootProject.version}-api.jar")
-            // 添加 sources jar
-            artifact(tasks.
-            named("kotlinSourcesJar")) {
-                classifier = "sources"
-            }
+        create<MavenPublication>("library") {
+            from(components["java"])
+            groupId = project.group.toString()
+            artifactId = rootProject.name
         }
     }
 }

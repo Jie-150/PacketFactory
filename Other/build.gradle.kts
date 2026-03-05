@@ -1,10 +1,10 @@
-taboolib{
+taboolib {
     subproject = true
 }
 
 dependencies {
-    compileOnly("ink.ptms.core:v12101:12101:mapped")
-    compileOnly("com.mojang:brigadier:1.0.500")
+    compileOnly("ink.ptms.core:v12104:12104:mapped")
+    compileOnly("ink.ptms:nms-all:1.0.0")
     compileOnly(project(":Common"))
 }
 

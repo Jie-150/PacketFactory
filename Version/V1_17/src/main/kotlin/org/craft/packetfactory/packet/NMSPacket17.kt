@@ -1,21 +1,20 @@
 package org.craft.packetfactory.packet
 
 import com.mojang.authlib.GameProfile
-import com.mojang.datafixers.util.Pair
-import it.unimi.dsi.fastutil.ints.IntArrayList
 import it.unimi.dsi.fastutil.objects.Object2IntMaps
 import it.unimi.dsi.fastutil.shorts.ShortSets
 import net.minecraft.commands.arguments.ArgumentAnchor
-import net.minecraft.core.*
-import net.minecraft.core.particles.ParticleParam
+import net.minecraft.core.BlockPosition
+import net.minecraft.core.EnumDirection
+import net.minecraft.core.IRegistry
+import net.minecraft.core.NonNullList
+import net.minecraft.core.SectionPosition
 import net.minecraft.nbt.MojangsonParser
-import net.minecraft.nbt.NBTTagCompound
+import net.minecraft.network.PacketDataSerializer
 import net.minecraft.network.chat.ChatComponentText
 import net.minecraft.network.chat.ChatMessageType
 import net.minecraft.network.chat.IChatBaseComponent
 import net.minecraft.network.protocol.game.*
-import net.minecraft.network.syncher.DataWatcher
-import net.minecraft.network.syncher.DataWatcherRegistry
 import net.minecraft.resources.MinecraftKey
 import net.minecraft.server.ScoreboardServer
 import net.minecraft.server.bossevents.BossBattleCustom
@@ -26,15 +25,12 @@ import net.minecraft.world.BossBattle
 import net.minecraft.world.EnumDifficulty
 import net.minecraft.world.EnumHand
 import net.minecraft.world.effect.MobEffect
-import net.minecraft.world.entity.Entity
-import net.minecraft.world.entity.EntityPose
-import net.minecraft.world.entity.EnumItemSlot
+import net.minecraft.world.entity.EntityTypes
 import net.minecraft.world.entity.ai.attributes.AttributeModifiable
-import net.minecraft.world.entity.npc.VillagerData
+import net.minecraft.world.entity.decoration.EntityPainting
 import net.minecraft.world.entity.player.PlayerAbilities
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.level.EnumGamemode
-import net.minecraft.world.level.block.state.IBlockData
 import net.minecraft.world.level.border.WorldBorder
 import net.minecraft.world.level.chunk.ChunkSection
 import net.minecraft.world.level.saveddata.maps.MapIcon
@@ -46,8 +42,11 @@ import net.minecraft.world.scores.criteria.IScoreboardCriteria
 import org.bukkit.Location
 import org.bukkit.Material
 import org.bukkit.Particle
+import org.bukkit.Sound
 import org.bukkit.block.Block
+import org.bukkit.block.BlockFace
 import org.bukkit.craftbukkit.v1_17_R1.CraftParticle
+import org.bukkit.craftbukkit.v1_17_R1.CraftSound
 import org.bukkit.craftbukkit.v1_17_R1.CraftStatistic
 import org.bukkit.craftbukkit.v1_17_R1.CraftWorld
 import org.bukkit.craftbukkit.v1_17_R1.attribute.CraftAttributeMap
@@ -55,6 +54,7 @@ import org.bukkit.craftbukkit.v1_17_R1.inventory.CraftItemStack
 import org.bukkit.craftbukkit.v1_17_R1.util.CraftChatMessage
 import org.bukkit.entity.EntityType
 import org.bukkit.util.Vector
+import org.craft.packetfactory.PacketFactory
 import org.craft.packetfactory.data.Attribute
 import org.craft.packetfactory.data.MapData
 import org.craft.packetfactory.data.PacketData
@@ -63,13 +63,12 @@ import taboolib.common.platform.function.pluginId
 import taboolib.common.platform.function.warning
 import taboolib.library.reflex.Reflex.Companion.invokeConstructor
 import taboolib.library.reflex.Reflex.Companion.setProperty
-import taboolib.library.reflex.Reflex.Companion.unsafeInstance
 import taboolib.module.nms.ItemTagData
+import taboolib.module.nms.createDataSerializer
 import taboolib.module.nms.remap.require
 import java.util.*
-import kotlin.jvm.optionals.getOrNull
 
-internal class NMS17 : NMSOut {
+internal class NMSPacket17 : NMSPacket {
     /**
      * 创建实体生成数据包
      *
@@ -82,15 +81,24 @@ internal class NMS17 : NMSOut {
      * @return PacketPlayOutSpawnEntity 实体生成数据包实例
      */
     override fun createSpawnEntity(data: PacketData): Any {
-        val entityType = data.read<String>("entityType")
+        val entityType = data.read<EntityType>("entityType")
         val entityId = data.read<Int>("entityId")
         val uuid = data.read<UUID>("uuid")
 
         val location = data.read<Location>("location")
         val data = data.readOrElse("data", 0)
-        val type = IRegistry.ENTITY_TYPE.get(MinecraftKey(entityType.uppercase()))
+        val type = IRegistry.ENTITY_TYPE.fromId(entityType.typeId.toInt())
         return PacketPlayOutSpawnEntity(
-            entityId, uuid, location.x, location.y, location.z, location.yaw, location.pitch, type, data, Vec3D.ZERO
+            entityId,
+            uuid,
+            location.x,
+            location.y,
+            location.z,
+            mathRot(location.yaw),
+            mathRot(location.pitch),
+            type,
+            data,
+            Vec3D.ZERO
         )
     }
 
@@ -114,149 +122,27 @@ internal class NMS17 : NMSOut {
         val pitch = mathRot(location.pitch)
         val yHeadRot = data.readOrElse("yHeadRot", 0).toByte()
 
-        return PacketPlayOutSpawnEntityLiving::class.java.unsafeInstance().also {
-            it.setProperty("id", entityId)
-            it.setProperty("uuid", uuid)
-            it.setProperty("type", entityType.typeId.toInt())
-            it.setProperty("x", location.x)
-            it.setProperty("y", location.y)
-            it.setProperty("z", location.z)
-            it.setProperty("yRot", yaw.toByte())
-            it.setProperty("xRot", pitch.toByte())
-            it.setProperty("yHeadRot", yHeadRot)
-        }
-    }
-
-    /**
-     * 创建经验球实体生成数据包
-     *
-     * @param data 包含经验球生成信息的数据对象，需要包含以下字段：
-     *             - id: Int 经验球ID（必需）
-     *             - location: Location 生成位置（必需）
-     *             - value: Int 经验值（可选，默认0）
-     * @return PacketPlayOutSpawnEntityExperienceOrb 经验球实体生成数据包实例
-     */
-    override fun createSpawnEntityExperienceOrb(data: PacketData): Any {
-        val id = data.read<Int>("id")
-        val location = data.read<Location>("location")
-        val value = data.readOrElse("value", 0)
-        return PacketPlayOutSpawnEntityExperienceOrb::class.java.unsafeInstance().also {
-            it.setProperty("id", id)
-            it.setProperty("x", location.x)
-            it.setProperty("y", location.y)
-            it.setProperty("z", location.z)
-            it.setProperty("value", value)
-        }
-    }
-
-    override fun createTeleportPosition(data: PacketData): Any {
-        val entityId = data.read<Int>("entityId")
-        val location = data.read<Location>("location")
-        val onGround = data.read<Boolean>("onGround")
-        return PacketPlayOutEntityTeleport::class.java.unsafeInstance().also {
-            it.setProperty("id", entityId)
-            it.setProperty("x", location.x)
-            it.setProperty("y", location.y)
-            it.setProperty("z", location.z)
-            it.setProperty("yRot", mathRot(location.pitch))
-            it.setProperty("xRot", mathRot(location.yaw))
-            it.setProperty("onGround", onGround)
-        }
-    }
-
-    override fun createEntityHeadRotation(data: PacketData): Any {
-        val entityId = data.read<Int>("entityId")
-        val pitch = data.read<Float>("pitch")
-        return PacketPlayOutEntityHeadRotation::class.java.unsafeInstance().also {
-            it.setProperty("id", entityId)
-            it.setProperty("yHeadRot", mathRot(pitch))
-        }
+        return PacketPlayOutSpawnEntityLiving(createDataSerializer {
+            writeInt(entityId)
+            writeUUID(uuid)
+            writeInt(IRegistry.ENTITY_TYPE.getId(EntityTypes.a(entityType.name).get()))
+            writeDouble(location.x)
+            writeDouble(location.y)
+            writeDouble(location.z)
+            writeFloat(pitch)
+            writeFloat(yaw)
+            writeByte(yHeadRot)
+        }.build() as PacketDataSerializer)
     }
 
     override fun createEntityMetadata(data: PacketData): Any {
-        val entityId = data.read<Int>("entityId")
-        val metadata = data.read<List<Any>>("metadata").map { getDataWatcherItem(it) }
-        return PacketPlayOutEntityMetadata::class.java.unsafeInstance().also {
-            it.setProperty("id", entityId)
-            it.setProperty("packedItems", metadata)
+        val metadata = data.read<Map<Int, Any>>("metadata").map {
+            PacketFactory.getDataWatcherItemAPI().getDataWatcherItem(it.key, it.value)
         }
-    }
-
-    override fun createEntityDestroy(data: PacketData): Any {
-        val entitys = IntArrayList(data.read<List<Int>>("entitys"))
-        return PacketPlayOutEntityDestroy(entitys)
-    }
-
-    override fun createRelEntityMove(data: PacketData): Any {
-        val entityId = data.read<Int>("entityId")
-        val location = data.readOrElse("location", emptyLocation)
-        val onGround = data.readOrElse("onGround", false)
-        return PacketPlayOutEntity.PacketPlayOutRelEntityMove(
-            entityId, location.blockX.toShort(), location.blockY.toShort(), location.blockZ.toShort(), onGround
-        )
-    }
-
-    override fun createEntityLook(data: PacketData): Any {
-        val entityId = data.read<Int>("entityId")
-        val yaw = data.read<Byte>("yaw")
-        val pitch = data.read<Byte>("pitch")
-        val onGround = data.readOrElse("onGround", false)
-        return PacketPlayOutEntity.PacketPlayOutEntityLook(entityId, pitch, yaw, onGround)
-    }
-
-    override fun createRelEntityMoveLook(data: PacketData): Any {
-        val entityId = data.read<Int>("entityId")
-        val location = data.read<Location>("location")
-        val onGround = data.readOrElse("onGround", false)
-        return PacketPlayOutEntity.PacketPlayOutRelEntityMoveLook(
-            entityId,
-            location.x.toInt().toShort(),
-            location.y.toInt().toShort(),
-            location.z.toInt().toShort(),
-            location.pitch.toInt().toByte(),
-            location.yaw.toInt().toByte(),
-            onGround
-        )
-    }
-
-    override fun createEntityEquipment(data: PacketData): Any {
-        val entityId = data.read<Int>("entityId")
-        val equipments = data.read<Map<String, org.bukkit.inventory.ItemStack>>("equipments").map {
-            Pair(EnumItemSlot.valueOf(it.key.uppercase()), toNMSItem(it.value))
-        }
-        return PacketPlayOutEntityEquipment(entityId, equipments)
-    }
-
-    override fun createAnimation(data: PacketData): Any {
-        val entityId = data.read<Int>("entityId")
-        val action = data.read<Int>("action")
-        return PacketPlayOutAnimation::class.java.unsafeInstance().also {
-            it.setProperty("id", entityId)
-            it.setProperty("action", action)
-        }
-    }
-
-    override fun createAttachEntity(data: PacketData): Any {
-        val sourceId = data.read<Int>("sourceId")
-        val destId = data.read<Int>("destId")
-        return PacketPlayOutAttachEntity::class.java.unsafeInstance().also {
-            it.setProperty("sourceId", sourceId)
-            it.setProperty("destId", destId)
-        }
-    }
-
-    override fun createEntityVelocity(data: PacketData): Any {
-        val entityId = data.read<Int>("entityId")
-        val vector = data.read<Vector>("vector")
-        return PacketPlayOutEntityVelocity(entityId, Vec3D(vector.x, vector.y, vector.z))
-    }
-
-    override fun createBed(data: PacketData): Any {
-        unsupported()
-    }
-
-    override fun createClearDialog(data: PacketData): Any {
-        unsupported()
+        return PacketPlayOutEntityMetadata(createDataSerializer {
+            writeInt(data.read("entityId"))
+            writeMetadataLegacy(metadata)
+        }.build() as PacketDataSerializer)
     }
 
     override fun createKeepAlive(data: PacketData): Any {
@@ -437,7 +323,7 @@ internal class NMS17 : NMSOut {
 
     override fun createPlayerChat(data: PacketData): Any {
         val text = component(data.read("text"))
-        val type = data.readEnum(ChatMessageType::class.java, "text")
+        val type = data.readEnumOrElse(ChatMessageType::class.java, "type", ChatMessageType.CHAT)
         val uuid = data.read<UUID>("uuid")
         return PacketPlayOutChat(text, type, uuid)
     }
@@ -463,10 +349,12 @@ internal class NMS17 : NMSOut {
         val players = data.read<List<PlayerData>>("players").map {
             PacketPlayOutPlayerInfo.PlayerInfoData(GameProfile(it.uuid, it.name), it.ping, EnumGamemode.valueOf(it.gamemode.name), null)
         }
-        return PacketPlayOutPlayerInfo::class.java.unsafeInstance().also {
-            it.setProperty("action", PacketPlayOutPlayerInfo.EnumPlayerInfoAction.REMOVE_PLAYER)
-            it.setProperty("entries", players)
-        }
+        return PacketPlayOutPlayerInfo(createDataSerializer {
+            writeEnumSet(EnumSet.of(PacketPlayOutPlayerInfo.EnumPlayerInfoAction.REMOVE_PLAYER), PacketPlayOutPlayerInfo.EnumPlayerInfoAction::class.java)
+            val players = data.read<List<PlayerData>>("players")
+            writeByte(players.size.toByte())
+            players.forEach { writeUUID(it.uuid) }
+        }.build() as PacketDataSerializer)
     }
 
     override fun createPlayerInfoUpdate(data: PacketData): Any {
@@ -474,10 +362,40 @@ internal class NMS17 : NMSOut {
         val players = data.read<List<PlayerData>>("players").map {
             PacketPlayOutPlayerInfo.PlayerInfoData(GameProfile(it.uuid, it.name), it.ping, EnumGamemode.valueOf(it.gamemode.name), null)
         }
-        return PacketPlayOutPlayerInfo::class.java.unsafeInstance().also {
-            it.setProperty("action", type)
-            it.setProperty("entries", players)
-        }
+        return PacketPlayOutPlayerInfo(
+            createDataSerializer {
+                writeInt(type.ordinal)
+                val players = data.read<List<PlayerData>>("players")
+                writeByte(players.size.toByte())
+                players.forEach {
+                    writeUUID(it.uuid)
+                    when (type.name) {
+                        "ADD_PLAYER" -> {
+                            writeUUID(it.uuid)
+                            writeString(it.name)
+                            writeInt(it.properties.size)
+                            it.properties.forEach { p ->
+                                writeString(p.name)
+                                writeString(p.value)
+                                writeBoolean(p.hasSignature())
+                                if (p.hasSignature()) {
+                                    writeString(p.signature!!)
+                                }
+                            }
+                            writeInt(it.gamemode.value)
+                            writeBoolean(it.hasDisplayName())
+                            if (it.hasDisplayName()) {
+                                writeString(it.displayName!!)
+                            }
+                        }
+
+                        "UPDATE_DISPLAY_NAME" -> {
+                            writeBoolean(true)
+                        }
+                    }
+                }
+            }.build() as PacketDataSerializer
+        )
     }
 
     override fun createPlayerRotation(data: PacketData): Any {
@@ -709,23 +627,6 @@ internal class NMS17 : NMSOut {
         }
     }
 
-    override fun createCamera(data: PacketData): Any {
-        return PacketPlayOutCamera::class.java.unsafeInstance().also {
-            it.setProperty("cameraId", data.read<Int>("cameraId"))
-        }
-    }
-
-    override fun createCloseWindow(data: PacketData): Any {
-        return PacketPlayOutCloseWindow(data.read<Int>("containerId"))
-    }
-
-    override fun createCollect(data: PacketData): Any {
-        val itemId = data.read<Int>("itemId")
-        val playerId = data.read<Int>("playerId")
-        val amount = data.read<Int>("amount")
-        return PacketPlayOutCollect(itemId, playerId, amount)
-    }
-
     override fun createCommands(data: PacketData): Any {
         TODO("Not yet implemented")
     }
@@ -742,28 +643,18 @@ internal class NMS17 : NMSOut {
     }
 
     override fun createEntitySound(data: PacketData): Any {
-        val sound = data.read<String>("sound")
-        val soundEffect = SoundEffect(MinecraftKey(pluginId, "entity_sound_$sound"))
-        val category = data.readEnumOrElse(SoundCategory::class.java, "category", SoundCategory.PLAYERS)
-        val entityId = data.read<Int>("entityId")
+        val sound = data.read<Sound>("sound")
+        val soundEffect = CraftSound.getSoundEffect(sound)
+        val category = EnumSet.of(data.readEnumOrElse(SoundCategory::class.java, "category", SoundCategory.PLAYERS))
         val volume = data.readOrElse("volume", 0.0f)
         val pitch = data.readOrElse("pitch", 0.0f)
-        return PacketPlayOutEntitySound::class.java.unsafeInstance().also {
-            it.setProperty("sound", soundEffect)
-            it.setProperty("source", category)
-            it.setProperty("id", entityId)
-            it.setProperty("volume", volume)
-            it.setProperty("pitch", pitch)
-        }
-    }
-
-    override fun createEntityStatus(data: PacketData): Any {
-        val entityId = data.read<Int>("entityId")
-        val eventId = data.read<Int>("eventId")
-        return PacketPlayOutEntityStatus::class.java.unsafeInstance().also {
-            it.setProperty("entityId", entityId)
-            it.setProperty("eventId", eventId)
-        }
+        return PacketPlayOutEntitySound(createDataSerializer {
+            writeInt(IRegistry.SOUND_EVENT.getId(soundEffect))
+            writeEnumSet(category, SoundCategory::class.java)
+            writeInt(data.read("entityId"))
+            writeFloat(volume)
+            writeFloat(pitch)
+        } as PacketDataSerializer)
     }
 
     override fun createExplosion(data: PacketData): Any {
@@ -780,16 +671,8 @@ internal class NMS17 : NMSOut {
         return PacketPlayOutGameStateChange(PacketPlayOutGameStateChange.a(change), param)
     }
 
-    override fun createHeldItemSlot(data: PacketData): Any {
-        return PacketPlayOutHeldItemSlot(data.read<Int>("slot"))
-    }
-
-    override fun createLightUpdate(data: PacketData): Any {
-        TODO("Not yet implemented")
-    }
-
     override fun createLogin(data: PacketData): Any {
-        TODO("该包目前不知道什么作用,参数过长暂时不做")
+        TODO("该包目前不知道什么作用,参数过多暂时不做")
     }
 
     override fun createLookAt(data: PacketData): Any {
@@ -810,11 +693,11 @@ internal class NMS17 : NMSOut {
 
     override fun createMount(data: PacketData): Any {
         val vehicle = data.read<Int>("vehicle")
-        val passengers = data.read<List<Int>>("passengers")
-        return PacketPlayOutMount::class.java.unsafeInstance().also {
-            it.setProperty("vehicle", vehicle)
-            it.setProperty("passengers", passengers.toTypedArray())
-        }
+        val passengers = data.read<List<Int>>("passengers").toTypedArray().toIntArray()
+        return PacketPlayOutMount(createDataSerializer {
+            writeInt(vehicle)
+            writeVarIntArray(passengers)
+        } as PacketDataSerializer)
     }
 
     override fun createMultiBlockChange(data: PacketData): Any {
@@ -866,7 +749,9 @@ internal class NMS17 : NMSOut {
     }
 
     override fun createPlayerListHeaderFooter(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val header = component(data.read("header"))
+        val footer = component(data.read("footer"))
+        return PacketPlayOutPlayerListHeaderFooter(header, footer)
     }
 
     override fun createPosition(data: PacketData): Any {
@@ -877,8 +762,8 @@ internal class NMS17 : NMSOut {
         val id = data.read<Int>("id")
         val dismountVehicle = data.readOrElse("dismountVehicle", false)
         return PacketPlayOutPosition(
-            location.x, location.y, location.z, mathRot(location.pitch).toFloat(),
-            mathRot(location.yaw).toFloat(), teleportFlags, id, dismountVehicle
+            location.x, location.y, location.z, mathRot(location.pitch),
+            mathRot(location.yaw), teleportFlags, id, dismountVehicle
         )
     }
 
@@ -1022,7 +907,11 @@ internal class NMS17 : NMSOut {
             val attribute = CraftAttributeMap.toMinecraft(a.attribute)
             AttributeModifiable(attribute) {
                 val modifier =
-                    org.bukkit.attribute.AttributeModifier(attribute.name, attribute.default, org.bukkit.attribute.AttributeModifier.Operation.ADD_NUMBER)
+                    org.bukkit.attribute.AttributeModifier(
+                        attribute.name,
+                        attribute.default,
+                        org.bukkit.attribute.AttributeModifier.Operation.ADD_NUMBER
+                    )
                 a.callback.accept(modifier)
                 warning("更新属性使用了回调函数,暂未实现修改")
             }.apply {
@@ -1048,13 +937,13 @@ internal class NMS17 : NMSOut {
 
     override fun createVehicleMove(data: PacketData): Any {
         val location = data.read<Location>("location")
-        return PacketPlayOutVehicleMove::class.java.unsafeInstance().also {
-            it.setProperty("x", location.x)
-            it.setProperty("y", location.y)
-            it.setProperty("z", location.z)
-            it.setProperty("yRot", mathRot(location.pitch))
-            it.setProperty("xRot", mathRot(location.yaw))
-        }
+        return PacketPlayOutVehicleMove(createDataSerializer {
+            writeDouble(location.x)
+            writeDouble(location.y)
+            writeDouble(location.z)
+            writeFloat(mathRot(location.pitch))
+            writeFloat(mathRot(location.yaw))
+        }.build() as PacketDataSerializer)
     }
 
     /**
@@ -1153,31 +1042,36 @@ internal class NMS17 : NMSOut {
         val uuid = data.read<UUID>("uuid")
         val location = data.read<Location>("location")
 
-        return PacketPlayOutNamedEntitySpawn::class.java.unsafeInstance().also {
-            it.setProperty("entityId", entityId)
-            it.setProperty("uuid", uuid)
-            it.setProperty("x", location.x)
-            it.setProperty("y", location.y)
-            it.setProperty("z", location.z)
-            it.setProperty("yaw", mathRot(location.yaw))
-            it.setProperty("pitch", mathRot(location.pitch))
-        }
+        return PacketPlayOutNamedEntitySpawn(createDataSerializer {
+            writeInt(entityId)
+            writeUUID(uuid)
+            writeDouble(location.x)
+            writeDouble(location.y)
+            writeDouble(location.z)
+            writeFloat(mathRot(location.pitch))
+            writeFloat(mathRot(location.yaw))
+        }.build() as PacketDataSerializer)
     }
 
     override fun createSpawnEntityPainting(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val location = data.read<Location>("location")
+        val direction = data.readEnumOrElse(EnumDirection::class.java, "direction", EnumDirection.WEST)
+        return PacketPlayOutSpawnEntityPainting(EntityPainting(null, location.toPosition(), EnumDirection.a(direction.name)))
     }
 
     private fun component(text: String): IChatBaseComponent {
         return if (text.startsWith("{") && text.endsWith("}")) {
             if (require(IChatBaseComponent.ChatSerializer::class.java)) {
-                listOf({ CraftChatMessage.fromJSON(text) }, { IChatBaseComponent.ChatSerializer.a(text) }).firstNotNullOf { runCatching(it).getOrNull() }
+                listOf(
+                    { CraftChatMessage.fromJSON(text) },
+                    { IChatBaseComponent.ChatSerializer.a(text) }
+                ).firstNotNullOf { runCatching(it).getOrNull() }
             } else {
                 CraftChatMessage.fromJSON(text)
             }
         } else {
             ChatComponentText(text)
-        } as IChatBaseComponent
+        }
     }
 
     private fun toNMSItem(itemStack: org.bukkit.inventory.ItemStack): ItemStack {
@@ -1186,113 +1080,5 @@ internal class NMS17 : NMSOut {
 
     fun Location.toPosition(): BlockPosition {
         return BlockPosition(blockX, blockY, blockZ)
-    }
-
-    fun getDataWatcherItem(value: Byte): DataWatcher.Item<Byte> {
-        return DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.BYTE), value)
-    }
-
-    fun getDataWatcherItem(value: Int): DataWatcher.Item<Int> {
-        return DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.INT), value)
-    }
-
-    fun getDataWatcherItem(value: Float): DataWatcher.Item<Float> {
-        return DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.FLOAT), value)
-    }
-
-    fun getDataWatcherItem(value: String): DataWatcher.Item<String> {
-        return DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.STRING), value)
-    }
-
-    fun getDataWatcherItem(value: IChatBaseComponent): DataWatcher.Item<IChatBaseComponent> {
-        return DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.COMPONENT), value)
-    }
-
-    @Suppress("UNCHECKED_CAST")
-    fun getOptionalDataWatcher(value: Optional<*>): DataWatcher.Item<out Optional<*>> {
-        return when (value.getOrNull()) {
-            is IChatBaseComponent -> DataWatcher.Item(
-                DataWatcher.a(Entity::class.java, DataWatcherRegistry.OPTIONAL_COMPONENT), value as Optional<IChatBaseComponent>
-            )
-
-            is IBlockData -> DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.BLOCK_STATE), value as Optional<IBlockData>)
-
-            is BlockPosition -> DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.OPTIONAL_BLOCK_POS), value as Optional<BlockPosition>)
-
-            is UUID -> DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.OPTIONAL_UUID), value as Optional<UUID>)
-
-            else -> error("不支持的类型: $value")
-        }
-    }
-
-    fun getDataWatcherItem(value: ItemStack): DataWatcher.Item<ItemStack> {
-        return DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.ITEM_STACK), value)
-    }
-
-    fun getDataWatcherItem(value: Boolean): DataWatcher.Item<Boolean> {
-        return DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.BOOLEAN), value)
-    }
-
-    fun getDataWatcherItem(value: ParticleParam): DataWatcher.Item<ParticleParam> {
-        return DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.PARTICLE), value)
-    }
-
-    fun getDataWatcherItem(value: Vector3f): DataWatcher.Item<Vector3f> {
-        return DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.ROTATIONS), value)
-    }
-
-    fun getDataWatcherItem(value: BlockPosition): DataWatcher.Item<BlockPosition> {
-        return DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.BLOCK_POS), value)
-    }
-
-    fun getDataWatcherItem(value: EnumDirection): DataWatcher.Item<EnumDirection> {
-        return DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.DIRECTION), value)
-    }
-
-    fun getDataWatcherItem(value: NBTTagCompound): DataWatcher.Item<NBTTagCompound> {
-        return DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.COMPOUND_TAG), value)
-    }
-
-    fun getDataWatcherItem(value: VillagerData): DataWatcher.Item<VillagerData> {
-        return DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.VILLAGER_DATA), value)
-    }
-
-    fun getDataWatcherItem(value: OptionalInt): DataWatcher.Item<OptionalInt> {
-        return DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.OPTIONAL_UNSIGNED_INT), value)
-    }
-
-    fun getDataWatcherItem(value: EntityPose): DataWatcher.Item<EntityPose> {
-        return DataWatcher.Item(DataWatcher.a(Entity::class.java, DataWatcherRegistry.POSE), value)
-    }
-
-    @Suppress("UNCHECKED_CAST")
-    fun getDataWatcherItem(value: Any): DataWatcher.Item<*> {
-        if (value is DataWatcher.Item<*>) return value
-        if (require(EntityPose::class.java) && value is EntityPose) {
-            return getDataWatcherItem(value)
-        }
-        if (require(VillagerData::class.java) && value is VillagerData) {
-            return getDataWatcherItem(value)
-        }
-        if (require(ParticleParam::class.java) && value is ParticleParam) {
-            return getDataWatcherItem(value)
-        }
-        return when (value) {
-            is String -> getDataWatcherItem(value)
-            is Byte -> getDataWatcherItem(value)
-            is Float -> getDataWatcherItem(value)
-            is NBTTagCompound -> getDataWatcherItem(value)
-            is OptionalInt -> getDataWatcherItem(value)
-            is Optional<*> -> getOptionalDataWatcher(value)
-            is EnumDirection -> getDataWatcherItem(value)
-            is BlockPosition -> getDataWatcherItem(value)
-            is Vector3f -> getDataWatcherItem(value)
-            is Boolean -> getDataWatcherItem(value)
-            is IChatBaseComponent -> getDataWatcherItem(value)
-            is ItemStack -> getDataWatcherItem(value)
-            is Int -> getDataWatcherItem(value)
-            is org.bukkit.inventory.ItemStack -> getDataWatcherItem(toNMSItem(value))
-            else -> error("不支持的类型: $value")
-        }
     }
 }

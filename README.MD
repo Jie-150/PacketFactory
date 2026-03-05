@@ -64,11 +64,11 @@ val packet = api.createSpawnEntity(data)
 
 ## 核心 API
 
-| 类 | 说明 |
-|---|---|
+| 类               | 说明                              |
+|-----------------|---------------------------------|
 | `PacketFactory` | 主入口，通过 `getOutPacketAPI()` 获取实例 |
-| `NMSOut` | 核心接口，定义所有数据包创建方法 |
-| `PacketData` | 数据容器，用于传递数据包参数 |
+| `NMSPacket`     | 核心接口，定义所有数据包创建方法                |
+| `PacketData`    | 数据容器，用于传递数据包参数                  |
 
 ## 注意事项
 

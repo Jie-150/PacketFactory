@@ -12,13 +12,6 @@ class PacketData {
             }
             return super.put(key, value)
         }
-
-        override fun putAll(m: Map<out String, out Any>) {
-            if (m.any { keys.contains(it.key) }) {
-                error("无法写入重复数据 ${m.entries.first { keys.contains(it.key) }.key}")
-            }
-            super.putAll(m)
-        }
     }
 
     fun write(key: String, value: Any) {
@@ -26,15 +19,13 @@ class PacketData {
     }
 
     fun write(data: Map<String, Any>) {
-        mapData.putAll(data)
+        data.forEach { (key, value) ->
+            mapData[key] = value
+        }
     }
 
     fun <T> read(key: String): T {
         return (mapData[key] ?: error("$key 不可为空")) as T
-    }
-
-    fun readOrNull(key: String): Any? {
-        return mapData[key]
     }
 
     fun <T> readOrNull(key: String): T? {
