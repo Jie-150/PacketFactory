@@ -44,7 +44,6 @@ import org.bukkit.Material
 import org.bukkit.Particle
 import org.bukkit.Sound
 import org.bukkit.block.Block
-import org.bukkit.block.BlockFace
 import org.bukkit.craftbukkit.v1_17_R1.CraftParticle
 import org.bukkit.craftbukkit.v1_17_R1.CraftSound
 import org.bukkit.craftbukkit.v1_17_R1.CraftStatistic
@@ -86,7 +85,7 @@ internal class NMSPacket17 : NMSPacket {
         val uuid = data.read<UUID>("uuid")
 
         val location = data.read<Location>("location")
-        val data = data.readOrElse("data", 0)
+        val extraData = data.readOrElse("extraData", 0)
         val type = IRegistry.ENTITY_TYPE.fromId(entityType.typeId.toInt())
         return PacketPlayOutSpawnEntity(
             entityId,
@@ -97,7 +96,7 @@ internal class NMSPacket17 : NMSPacket {
             mathRot(location.yaw),
             mathRot(location.pitch),
             type,
-            data,
+            extraData,
             Vec3D.ZERO
         )
     }
@@ -146,7 +145,7 @@ internal class NMSPacket17 : NMSPacket {
     }
 
     override fun createKeepAlive(data: PacketData): Any {
-        return PacketPlayOutKeepAlive(data.read<Long>("id"))
+        return PacketPlayOutKeepAlive(data.read<Long>("keepAliveID"))
     }
 
     override fun createPing(data: PacketData): Any {
@@ -339,7 +338,7 @@ internal class NMSPacket17 : NMSPacket {
     }
 
     override fun createPlayerCombatKill(data: PacketData): Any {
-        val player = data.read<Int>("player")
+        val player = data.read<Int>("playerId")
         val killer = data.read<Int>("killer")
         val message = component(data.read("text"))
         return ClientboundPlayerCombatKillPacket(player, killer, message)
@@ -519,13 +518,13 @@ internal class NMSPacket17 : NMSPacket {
     }
 
     override fun createAbilities(data: PacketData): Any {
-        val abilities = data.bind(PlayerAbilities()).readNotNull<Boolean>("invulnerable") {
+        val abilities = data.bind(PlayerAbilities()).readNotNull<Boolean>("isInvulnerable") {
             invulnerable = it
         }.readNotNull<Boolean>("isFlying") {
             flying = it
         }.readNotNull<Boolean>("canFly") {
             mayfly = it
-        }.readNotNull<Boolean>("instabuild") {
+        }.readNotNull<Boolean>("mayBuild") {
             instabuild = it
         }.readNotNull<Float>("flyingSpeed") {
             flyingSpeed = it
@@ -546,9 +545,9 @@ internal class NMSPacket17 : NMSPacket {
     override fun createBlockAction(data: PacketData): Any {
         val location = data.read<Location>("location").toPosition()
         val block = IRegistry.BLOCK[MinecraftKey(data.read<Block>("block").type.name)]
-        val x = data.read<Int>("x")
-        val z = data.read<Int>("z")
-        return PacketPlayOutBlockAction(location, block, x, z)
+        val action = data.read<Int>("action")
+        val param = data.read<Int>("param")
+        return PacketPlayOutBlockAction(location, block, action, param)
     }
 
     override fun createBlockBreakAnimation(data: PacketData): Any {
@@ -637,7 +636,7 @@ internal class NMSPacket17 : NMSPacket {
         val duration = data.readOrElse("duration", 0)
         val amplifier = data.readOrElse("amplifier", 0)
         val ambient = data.readOrElse("ambient", false)
-        val visible = data.readOrElse("visible", true)
+        val visible = data.readOrElse("showParticles", true)
         val showIcon = data.readOrElse("showIcon", true)
         return PacketPlayOutEntityEffect(entityId, MobEffect(effect, duration, amplifier, ambient, visible, showIcon))
     }
@@ -666,9 +665,9 @@ internal class NMSPacket17 : NMSPacket {
     }
 
     override fun createGameStateChange(data: PacketData): Any {
-        val change = data.read<Int>("change")
+        val state = data.read<Int>("state")
         val param = data.read<Float>("param")
-        return PacketPlayOutGameStateChange(PacketPlayOutGameStateChange.a(change), param)
+        return PacketPlayOutGameStateChange(PacketPlayOutGameStateChange.a(state), param)
     }
 
     override fun createLogin(data: PacketData): Any {
@@ -756,10 +755,10 @@ internal class NMSPacket17 : NMSPacket {
 
     override fun createPosition(data: PacketData): Any {
         val location = data.read<Location>("location")
-        val teleportFlags = data.readOrElse("teleportflags", listOf<String>()).map {
+        val teleportFlags = data.readOrElse("teleportFlags", listOf<String>()).map {
             PacketPlayOutPosition.EnumPlayerTeleportFlags.valueOf(it)
         }.toSet()
-        val id = data.read<Int>("id")
+        val id = data.read<Int>("entityId")
         val dismountVehicle = data.readOrElse("dismountVehicle", false)
         return PacketPlayOutPosition(
             location.x, location.y, location.z, mathRot(location.pitch),
@@ -773,7 +772,7 @@ internal class NMSPacket17 : NMSPacket {
 
     override fun createRemoveEntityEffect(data: PacketData): Any {
         val entityId = data.read<Int>("entityId")
-        val effect = IRegistry.MOB_EFFECT[MinecraftKey(data.read("effect"))]
+        val effect = IRegistry.MOB_EFFECT[MinecraftKey(data.read("effectId"))]
         return PacketPlayOutRemoveEntityEffect(entityId, effect)
     }
 
@@ -790,7 +789,7 @@ internal class NMSPacket17 : NMSPacket {
 
     override fun createScoreboardDisplayObjective(data: PacketData): Any {
         val objectiveName = data.read<String>("name")
-        val slot = data.readOrElse("slot", 0)
+        val slot = data.readOrElse("position", 0)
         val criteria = data.read<String>("criteria")
         val displayName = data.read<String>("displayName")
         val healthDisplay = data.readEnum(IScoreboardCriteria.EnumScoreboardHealthDisplay::class.java, "healthDisplay")
@@ -924,13 +923,13 @@ internal class NMSPacket17 : NMSPacket {
     override fun createUpdateHealth(data: PacketData): Any {
         val health = data.read<Float>("health")
         val food = data.read<Int>("food")
-        val saturation = data.read<Float>("saturation")
+        val saturation = data.read<Float>("foodSaturation")
         return PacketPlayOutUpdateHealth(health, food, saturation)
     }
 
     override fun createUpdateTime(data: PacketData): Any {
-        val gameTime = data.read<Long>("gameTime")
-        val dayTime = data.read<Long>("dayTime")
+        val gameTime = data.read<Long>("tick")
+        val dayTime = data.read<Long>("time")
         val flag = data.read<Boolean>("flag")
         return PacketPlayOutUpdateTime(gameTime, dayTime, flag)
     }
@@ -1010,7 +1009,7 @@ internal class NMSPacket17 : NMSPacket {
     override fun createWorldEvent(data: PacketData): Any {
         val type = data.read<Int>("type")
         val location = data.read<Location>("location")
-        val dataValue = data.read<Int>("data")
+        val dataValue = data.read<Int>("dataValue")
         val globalEvent = data.read<Boolean>("globalEvent")
         return PacketPlayOutWorldEvent(type, location.toPosition(), dataValue, globalEvent)
     }

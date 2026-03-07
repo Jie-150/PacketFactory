@@ -49,7 +49,17 @@ internal class NMSPacket21 : NMSPacket {
         val type = BuiltInRegistries.ENTITY_TYPE.byId(entityType.typeId.toInt())
 
         return PacketPlayOutSpawnEntity(
-            entityId, uuid, location.x, location.y, location.z, fixYaw(entityType, location.yaw), location.pitch, type, extraData, Vec3D.ZERO, yHeadRot
+            entityId,
+            uuid,
+            location.x,
+            location.y,
+            location.z,
+            fixYaw(entityType, location.yaw),
+            location.pitch,
+            type,
+            extraData,
+            Vec3D.ZERO,
+            yHeadRot
         )
     }
 
@@ -637,7 +647,7 @@ internal class NMSPacket21 : NMSPacket {
     override fun createWorldEvent(data: PacketData): Any {
         val type = data.read<Int>("type")
         val location = data.read<Location>("location").toPosition()
-        val dataValue = data.read<Int>("data")
+        val dataValue = data.read<Int>("dataValue")
         val globalEvent = data.readOrElse("globalEvent", false)
         return PacketPlayOutWorldEvent(type, location, dataValue, globalEvent)
     }

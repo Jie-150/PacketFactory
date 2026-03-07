@@ -17,10 +17,9 @@ import org.bukkit.craftbukkit.v1_16_R3.CraftParticle
 import org.bukkit.craftbukkit.v1_16_R3.CraftSound
 import org.bukkit.craftbukkit.v1_16_R3.CraftWorld
 import org.bukkit.craftbukkit.v1_16_R3.attribute.CraftAttributeMap
-import org.bukkit.craftbukkit.v1_16_R3.entity.CraftEntity
+import org.bukkit.craftbukkit.v1_16_R3.block.CraftBlock
 import org.bukkit.craftbukkit.v1_16_R3.inventory.CraftItemStack
 import org.bukkit.craftbukkit.v1_16_R3.util.CraftChatMessage
-import org.bukkit.craftbukkit.v1_16_R3.util.CraftMagicNumbers
 import org.bukkit.entity.EntityType
 import org.bukkit.util.Vector
 import org.craft.packetfactory.PacketFactory
@@ -48,7 +47,7 @@ internal class NMSPacketLegacy : NMSPacket {
         val uuid = data.read<UUID>("uuid")
         val location = data.readOrElse("location", emptyLocation)
         val yaw = mathRot(fixYaw(entityType, location.yaw))
-        val dataValue = data.readOrElse("data", 0)
+        val extraData = data.readOrElse("extraData", 0)
         return NMS16SpawnEntity().also {
             it.a(createDataSerializer {
                 writeInt(entityId)
@@ -59,7 +58,7 @@ internal class NMSPacketLegacy : NMSPacket {
                 writeDouble(location.z)
                 writeFloat(mathRot(location.pitch))
                 writeFloat(yaw)
-                writeInt(dataValue)
+                writeInt(extraData)
                 writeShort(0)
                 writeShort(0)
                 writeShort(0)
@@ -73,7 +72,7 @@ internal class NMSPacketLegacy : NMSPacket {
         val entityType = data.readOrElse("entityType", EntityType.PLAYER)
         val location = data.readOrElse("location", emptyLocation)
         val yaw = mathRot(fixYaw(entityType, location.yaw))
-        val extraData = data.readOrElse("data", 0)
+        val extraData = data.readOrElse("extraData", 0)
 
         return NMS16SpawnEntityLiving().also {
             it.a(createDataSerializer {
@@ -141,7 +140,7 @@ internal class NMSPacketLegacy : NMSPacket {
 
     override fun createEntityMetadata(data: PacketData): Any {
         val entityId = data.read<Int>("entityId")
-        val items = data.readOrElse<Map<Int, Any>>("items", mapOf()).map {
+        val items = data.readOrElse<Map<Int, Any>>("metadata", mapOf()).map {
             PacketFactory.getDataWatcherItemAPI().getDataWatcherItem(it.key, it) as DataWatcher.Item<*>
         }
         return NMS16EntityMetadata().also {
@@ -164,12 +163,12 @@ internal class NMSPacketLegacy : NMSPacket {
     }
 
     override fun createAttachEntity(data: PacketData): Any {
-        val attackId = data.read<Int>("attackId")
-        val entityId = data.read<Int>("entityId")
+        val sourceId = data.read<Int>("sourceId")
+        val destId = data.read<Int>("destId")
         return NMS16AttachEntity().also {
             it.a(createDataSerializer {
-                writeInt(attackId)
-                writeInt(entityId)
+                writeInt(sourceId)
+                writeInt(destId)
             }.build() as PacketDataSerializer)
         }
     }
@@ -203,12 +202,12 @@ internal class NMSPacketLegacy : NMSPacket {
     }
 
     override fun createPlayerCombatEnd(data: PacketData): Any {
-        val entity = data.readOrElse("entity", -1)
+        val killer = data.readOrElse("killer", -1)
         val duration = data.readOrElse("duration", 0)
         return NMS16CombatEvent().also {
             it.setProperty("a", PacketPlayOutCombatEvent.EnumCombatEventType.END_COMBAT)
             it.setProperty("d", duration)
-            it.setProperty("c", entity)
+            it.setProperty("c", killer)
         }
     }
 
@@ -219,13 +218,13 @@ internal class NMSPacketLegacy : NMSPacket {
     }
 
     override fun createPlayerCombatKill(data: PacketData): Any {
-        val attack = data.read<Int>("entityId")
-        val entity = data.readOrElse("entity", -1)
+        val playerId = data.read<Int>("playerId")
+        val killer = data.readOrElse("killer", -1)
         val text = component(data.read("text"))
         return NMS16CombatEvent().also {
             it.setProperty("a", PacketPlayOutCombatEvent.EnumCombatEventType.ENTITY_DIED)
-            it.setProperty("b", attack)
-            it.setProperty("c", entity)
+            it.setProperty("b", playerId)
+            it.setProperty("c", killer)
             it.setProperty("e", text)
         }
     }
@@ -320,11 +319,13 @@ internal class NMSPacketLegacy : NMSPacket {
     }
 
     override fun createBlockAction(data: PacketData): Any {
+        val block = data.read<Material>("block")
+        check(!block.isBlock) { "传入的材质为非方块材质" }
         val location = data.read<Location>("location").toPosition()
-        val block = IRegistry.BLOCK[MinecraftKey(data.read<String>("block"))]
+        val craftBlock = IRegistry.BLOCK.fromId(block.id)
         val action = data.readOrElse("action", 0)
         val param = data.readOrElse("param", 0)
-        return NMS16BlockAction(location, block, action, param)
+        return NMS16BlockAction(location, craftBlock, action, param)
     }
 
     override fun createBlockBreakAnimation(data: PacketData): Any {
@@ -370,9 +371,9 @@ internal class NMSPacketLegacy : NMSPacket {
 
     override fun createEntityEffect(data: PacketData): Any {
         val entityId = data.read<Int>("entityId")
-        val effectId = data.read<Int>("effect")
+        val effectId = data.read<Int>("effectId")
         val duration = data.readOrElse("duration", 0)
-        val amplification = data.readOrElse("amplification", 0)
+        val amplification = data.readOrElse("amplifier", 0)
         val ambient = data.readOrElse("ambient", false)
         val showParticles = data.readOrElse("showParticles", false)
         val showIcon = data.readOrElse("showIcon", false)
@@ -410,16 +411,16 @@ internal class NMSPacketLegacy : NMSPacket {
 
     override fun createExplosion(data: PacketData): Any {
         val location = data.read<Location>("location")
-        val strength = data.readOrElse("strength", 1.0f)
-        val locations = data.readOrElse("locations", emptyList<Location>()).map { it.toPosition() }
-        val motion = data.readOrElse("motion", Vector())
+        val power = data.readOrElse("power", 1.0f)
+        val locations = data.readOrElse("positions", emptyList<Location>()).map { it.toPosition() }
+        val vector = data.readOrElse("vector", Vector())
         return NMS16Explosion(
             location.x,
             location.y,
             location.z,
-            strength,
+            power,
             locations,
-            Vec3D(motion.x, motion.y, motion.z)
+            Vec3D(vector.x, vector.y, vector.z)
         )
     }
 
@@ -449,14 +450,14 @@ internal class NMSPacketLegacy : NMSPacket {
                 writeVarInt(emptySkyYMask)
                 writeVarInt(emptyBlockYMask)
                 skyUpdates.forEachIndexed { index, bytes ->
-                    if (index >= skyYMask){
+                    if (index >= skyYMask) {
                         return@forEachIndexed
                     }
                     writeVarInt(2048)
                     writeBytes(bytes)
                 }
                 blockUpdates.forEachIndexed { index, bytes ->
-                    if (index >= blockYMask){
+                    if (index >= blockYMask) {
                         return@forEachIndexed
                     }
                     writeVarInt(2048)
@@ -487,7 +488,7 @@ internal class NMSPacketLegacy : NMSPacket {
         val track = data.readOrElse("track", false)
         val locked = data.readOrElse("locked", false)
         val colors = data.readOrElse("colors", ByteArray(128 * 128))
-        val maps = data.readOrElse("map", emptyList<MapData>()).map {
+        val maps = data.readOrElse("maps", emptyList<MapData>()).map {
             MapIcon(MapIcon.Type.valueOf(it.type), it.x, it.z, it.rotation, component(it.name))
         }
         val startX = data.readOrElse("startX", 0)
@@ -498,7 +499,7 @@ internal class NMSPacketLegacy : NMSPacket {
     }
 
     override fun createMount(data: PacketData): Any {
-        val entityId = data.read<Int>("entityId")
+        val entityId = data.read<Int>("vehicle")
         val passengers = data.readOrElse("passengers", emptyList<Int>())
 
         return NMS16Mount().also {
@@ -520,7 +521,7 @@ internal class NMSPacketLegacy : NMSPacket {
     }
 
     override fun createNamedSoundEffect(data: PacketData): Any {
-        val soundName = data.read<String>("soundName")
+        val soundName = data.read<String>("sound")
         val location = data.read<Location>("location")
         val category = data.readEnumOrElse(SoundCategory::class.java, "category", SoundCategory.PLAYERS)
         val volume = data.readOrElse("volume", 1.0f)
@@ -575,8 +576,8 @@ internal class NMSPacketLegacy : NMSPacket {
     }
 
     override fun createOpenWindowHorse(data: PacketData): Any {
-        val windowId = data.read<Int>("windowId")
-        val slot = data.readOrElse("slot", 0)
+        val windowId = data.read<Int>("containerId")
+        val slot = data.readOrElse("size", 0)
         val entityId = data.read<Int>("entityId")
         return NMS16OpenWindowHorse(windowId, slot, entityId)
     }
@@ -632,10 +633,10 @@ internal class NMSPacketLegacy : NMSPacket {
 
         val dimension = (world as CraftWorld).handle.dimensionManager
         val seed = world.seed
-        val previous = data.readEnumOrElse(EnumGamemode::class.java, "previousGamemode", EnumGamemode.SURVIVAL)
+        val previous = data.readEnumOrElse(EnumGamemode::class.java, "previousGameMode", EnumGamemode.SURVIVAL)
         val gamemode = data.readEnumOrElse(EnumGamemode::class.java, "gamemode", EnumGamemode.SURVIVAL)
         val isDebug = data.readOrElse("isDebug", false)
-        val isFlat = data.readOrElse("isFlag", false)
+        val isFlat = data.readOrElse("isFlat", false)
         val isCopy = data.readOrElse("isCopy", false)
         return NMS16Respawn(dimension, type, seed, previous, gamemode, isDebug, isFlat, isCopy)
     }
@@ -711,7 +712,7 @@ internal class NMSPacketLegacy : NMSPacket {
     }
 
     override fun createSelectAdvancementTab(data: PacketData): Any {
-        val advancement = data.read<String>("advancement")
+        val advancement = data.read<String>("identifier")
         return NMS16SelectAdvancementTab(MinecraftKey(advancement))
     }
 
@@ -723,7 +724,7 @@ internal class NMSPacketLegacy : NMSPacket {
 
     override fun createSetCooldown(data: PacketData): Any {
         val item = data.read<org.bukkit.inventory.ItemStack>("item")
-        val cooldown = data.read<Int>("cooldown")
+        val cooldown = data.read<Int>("duration")
         return NMS16SetCooldown(toNMSItem(item).item, cooldown)
     }
 
@@ -736,7 +737,7 @@ internal class NMSPacketLegacy : NMSPacket {
 
     override fun createSpawnPosition(data: PacketData): Any {
         val location = data.read<Location>("location").toPosition()
-        val id = data.readOrElse("id", 0f)
+        val id = data.readOrElse("angle", 0f)
         return NMS16SpawnPosition(location, id)
     }
 
@@ -746,7 +747,7 @@ internal class NMSPacketLegacy : NMSPacket {
 
     override fun createStopSound(data: PacketData): Any {
         val key = MinecraftKey(data.read<String>("key"))
-        val sound = data.readEnumOrElse(SoundCategory::class.java, "sound", SoundCategory.PLAYERS)
+        val sound = data.readEnumOrElse(SoundCategory::class.java, "category", SoundCategory.PLAYERS)
         return NMS16StopSound(key, sound)
     }
 
@@ -760,7 +761,7 @@ internal class NMSPacketLegacy : NMSPacket {
 
     override fun createTileEntityData(data: PacketData): Any {
         val location = data.read<Location>("location").toPosition()
-        val action = data.read<Int>("action")
+        val action = data.read<Int>("type")
         val nbt = data.read<ItemTagData>("nbt").saveToString()
         return NMS16TileEntityData(location, action, MojangsonParser.parse(nbt))
     }
@@ -790,7 +791,7 @@ internal class NMSPacketLegacy : NMSPacket {
     override fun createUpdateTime(data: PacketData): Any {
         val tick = data.read<Long>("tick")
         val time = data.read<Long>("time")
-        val isIncreasing = data.readOrElse("increasing", false)
+        val isIncreasing = data.readOrElse("flag", false)
         return NMS16UpdateTime(tick, time, isIncreasing)
     }
 
@@ -812,7 +813,7 @@ internal class NMSPacketLegacy : NMSPacket {
     }
 
     override fun createViewDistance(data: PacketData): Any {
-        val distance = data.read<Int>("distance")
+        val distance = data.read<Int>("radius")
         return NMS16ViewDistance(distance)
     }
 
@@ -836,7 +837,7 @@ internal class NMSPacketLegacy : NMSPacket {
         val type = data.read<Int>("type")
         val location = data.readOrElse("location", emptyLocation)
         val dataValue = data.readOrElse("dataValue", 0)
-        val flag = data.readOrElse("flag", false)
+        val flag = data.readOrElse("globalEvent", false)
         return NMS16WorldEvent(type, location.toPosition(), dataValue, flag)
     }
 
@@ -863,7 +864,7 @@ internal class NMSPacketLegacy : NMSPacket {
     }
 
     override fun createNamedEntitySpawn(data: PacketData): Any {
-        val id = data.read<Int>("id")
+        val id = data.read<Int>("entityId")
         val uuid = data.read<UUID>("uuid")
         val location = data.readOrElse("location", emptyLocation)
         return NMS16NamedEntitySpawn().also {

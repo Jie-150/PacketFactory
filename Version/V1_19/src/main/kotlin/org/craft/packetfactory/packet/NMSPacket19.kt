@@ -641,7 +641,7 @@ internal class NMSPacket19 : NMSPacket {
     override fun createWorldEvent(data: PacketData): Any {
         val type = data.read<Int>("type")
         val location = data.read<Location>("location").toPosition()
-        val dataValue = data.read<Int>("data")
+        val dataValue = data.read<Int>("dataValue")
         val globalEvent = data.readOrElse("globalEvent", false)
         return PacketPlayOutWorldEvent(type, location, dataValue, globalEvent)
     }

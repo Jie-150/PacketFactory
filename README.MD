@@ -75,3 +75,7 @@ val packet = api.createSpawnEntity(data)
 - 库只负责创建数据包对象，发送需配合 TabooLib 或自己获取CraftPlayer的sendPacket方法
 - 使用前确保 PacketData 包含所有必需参数
 - 部分版本的某些方法可能未完全实现
+
+## 文档生成
+和 Claude Code 说这句话即可生成
+帮我读 PacketFactory 项目，按版本分页生成 HTML Javadoc。每个方法显示所有key值和类型，有默认值标注（默认xxx），包含版本索引首页和固定返回按钮，生成在项目根目录的 javadoc 文件夹。

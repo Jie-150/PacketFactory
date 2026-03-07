@@ -52,11 +52,11 @@ interface NMSPacket {
     fun createSpawnEntityExperienceOrb(data: PacketData): Any {
         val location = data.read<Location>("location")
         return nmsClass("PacketPlayOutSpawnEntityExperienceOrb").invokeConstructor(createDataSerializer {
-            writeInt(data.read("id"))
+            writeInt(data.read("entityId"))
             writeDouble(location.x)
             writeDouble(location.y)
             writeDouble(location.z)
-            writeShort(data.readOrElse("value", 0.toShort()))
+            writeShort(data.readOrElse("count", 0.toShort()))
         }.build())
     }
 
@@ -135,7 +135,7 @@ interface NMSPacket {
     fun createAnimation(data: PacketData): Any {
         return nmsClass("PacketPlayOutAnimation").invokeConstructor(createDataSerializer {
             writeInt(data.read("entityId"))
-            writeByte(data.read<Int>("action").toByte())
+            writeByte(data.read<Int>("animation").toByte())
         }.build())
     }
 
