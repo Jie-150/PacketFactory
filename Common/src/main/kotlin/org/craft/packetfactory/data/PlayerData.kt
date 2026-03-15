@@ -24,4 +24,8 @@ class PlayerData(val uuid: UUID, val entityId: Int) {
 
         fun hasSignature() = signature != null
     }
+
+    enum class Type {
+        ADD_PLAYER,UPDATE_GAME_MODE,UPDATE_LATENCY,UPDATE_DISPLAY_NAME,REMOVE_PLAYER
+    }
 }

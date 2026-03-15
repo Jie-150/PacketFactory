@@ -17,10 +17,11 @@ import org.bukkit.craftbukkit.v1_16_R3.CraftParticle
 import org.bukkit.craftbukkit.v1_16_R3.CraftSound
 import org.bukkit.craftbukkit.v1_16_R3.CraftWorld
 import org.bukkit.craftbukkit.v1_16_R3.attribute.CraftAttributeMap
-import org.bukkit.craftbukkit.v1_16_R3.block.CraftBlock
 import org.bukkit.craftbukkit.v1_16_R3.inventory.CraftItemStack
+import org.bukkit.craftbukkit.v1_16_R3.inventory.CraftMerchantRecipe
 import org.bukkit.craftbukkit.v1_16_R3.util.CraftChatMessage
 import org.bukkit.entity.EntityType
+import org.bukkit.inventory.MerchantRecipe
 import org.bukkit.util.Vector
 import org.craft.packetfactory.PacketFactory
 import org.craft.packetfactory.data.MapData
@@ -56,8 +57,8 @@ internal class NMSPacketLegacy : NMSPacket {
                 writeDouble(location.x)
                 writeDouble(location.y)
                 writeDouble(location.z)
-                writeFloat(mathRot(location.pitch))
-                writeFloat(yaw)
+                writeFloat(mathRot(location.pitch).toFloat())
+                writeFloat(yaw.toFloat())
                 writeInt(extraData)
                 writeShort(0)
                 writeShort(0)
@@ -121,8 +122,8 @@ internal class NMSPacketLegacy : NMSPacket {
                 writeDouble(location.x)
                 writeDouble(location.y)
                 writeDouble(location.z)
-                writeFloat(mathRot(location.pitch))
-                writeFloat(mathRot(location.yaw))
+                writeFloat(mathRot(location.pitch).toFloat())
+                writeFloat(mathRot(location.yaw).toFloat())
                 writeBoolean(onGround)
             }.build() as PacketDataSerializer)
         }
@@ -133,7 +134,7 @@ internal class NMSPacketLegacy : NMSPacket {
         return NMS16EntityHeadRotation().also {
             it.a(createDataSerializer {
                 writeInt(entityId)
-                writeFloat(mathRot(data.read("yHeadRot")))
+                writeFloat(mathRot(data.read("yHeadRot")).toFloat())
             }.build() as PacketDataSerializer)
         }
     }
@@ -583,7 +584,16 @@ internal class NMSPacketLegacy : NMSPacket {
     }
 
     override fun createOpenWindowMerchant(data: PacketData): Any {
-        throw UnsupportedOperationException("暂未实现操作")
+        val containerId = data.read<Int>("containerId")
+        val recipes = MerchantRecipeList()
+        data.read<List<MerchantRecipe>>("recipes").forEach {
+            recipes += CraftMerchantRecipe.fromBukkit(it).toMinecraft()
+        }
+        val villagerLevel = data.read<Int>("villagerLevel")
+        val villagerXp = data.read<Int>("villagerXp")
+        val showProgress = data.read<Boolean>("showProgress")
+        val canRestock = data.read<Boolean>("canRestock")
+        return PacketPlayOutOpenWindowMerchant(containerId, recipes, villagerLevel, villagerXp, showProgress, canRestock)
     }
 
     override fun createPlayerListHeaderFooter(data: PacketData): Any {
@@ -605,8 +615,8 @@ internal class NMSPacketLegacy : NMSPacket {
             location.x,
             location.y,
             location.z,
-            mathRot(location.yaw),
-            mathRot(location.pitch),
+            mathRot(location.yaw).toFloat(),
+            mathRot(location.pitch).toFloat(),
             teleportFlags,
             entityId
         )
@@ -802,8 +812,8 @@ internal class NMSPacketLegacy : NMSPacket {
                 writeDouble(location.x)
                 writeDouble(location.y)
                 writeDouble(location.z)
-                writeFloat(mathRot(location.yaw))
-                writeFloat(mathRot(location.pitch))
+                writeFloat(mathRot(location.yaw).toFloat())
+                writeFloat(mathRot(location.pitch).toFloat())
             }.build() as PacketDataSerializer)
         }
     }
@@ -874,8 +884,8 @@ internal class NMSPacketLegacy : NMSPacket {
                 writeDouble(location.x)
                 writeDouble(location.y)
                 writeDouble(location.z)
-                writeFloat(mathRot(location.yaw))
-                writeFloat(mathRot(location.pitch))
+                writeFloat(mathRot(location.yaw).toFloat())
+                writeFloat(mathRot(location.pitch).toFloat())
             }.build() as PacketDataSerializer)
         }
     }

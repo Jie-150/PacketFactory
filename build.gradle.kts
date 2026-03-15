@@ -30,6 +30,7 @@ subprojects {
         compileOnly(kotlin("stdlib"))
         // server
         compileOnly("com.google.code.gson:gson:2.8.7")
+        compileOnly("com.mojang:brigadier:1.0.500")
     }
     tasks.withType<JavaCompile> {
         options.encoding = "UTF-8"

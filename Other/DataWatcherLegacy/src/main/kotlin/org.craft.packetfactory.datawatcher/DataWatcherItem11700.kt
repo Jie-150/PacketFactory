@@ -12,6 +12,7 @@ import net.minecraft.world.entity.EntityPose
 import net.minecraft.world.entity.npc.VillagerData
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.level.block.state.IBlockData
+import org.bukkit.craftbukkit.v1_21_R3.inventory.CraftItemStack
 import taboolib.module.nms.remap.require
 import java.util.Optional
 import java.util.OptionalInt
@@ -19,7 +20,7 @@ import java.util.UUID
 import kotlin.jvm.java
 import kotlin.jvm.optionals.getOrNull
 
-internal class DataWatcherItem11700: DataWatcherItem {
+internal class DataWatcherItem11700 : DataWatcherItem {
 
     fun getDataWatcherItem(index: Int, value: Byte): DataWatcher.Item<Byte> {
         return DataWatcher.Item(DataWatcherRegistry.BYTE.createAccessor(index), value)
@@ -124,13 +125,13 @@ internal class DataWatcherItem11700: DataWatcherItem {
             is IChatBaseComponent -> getDataWatcherItem(index, value)
             is ItemStack -> getDataWatcherItem(index, value)
             is Int -> getDataWatcherItem(index, value)
-            is ItemStack -> getDataWatcherItem(index, toNMSItem(value))
+            is org.bukkit.inventory.ItemStack -> getDataWatcherItem(index, toNMSItem(value))
             else -> error("不支持的类型: $value")
         }
     }
 
 
-    private fun toNMSItem(itemStack: ItemStack): ItemStack {
+    private fun toNMSItem(itemStack: org.bukkit.inventory.ItemStack): ItemStack {
         return CraftItemStack.asNMSCopy(itemStack)
     }
 }

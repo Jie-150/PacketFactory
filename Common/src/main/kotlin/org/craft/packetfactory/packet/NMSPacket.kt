@@ -1,9 +1,7 @@
 package org.craft.packetfactory.packet
 
 import com.mojang.datafixers.util.Pair
-import net.minecraft.server.v1_16_R3.PacketPlayOutHeldItemSlot
 import org.bukkit.Location
-import org.bukkit.block.BlockFace
 import org.bukkit.entity.EntityType
 import org.bukkit.util.Vector
 import org.craft.packetfactory.data.PacketData
@@ -14,7 +12,7 @@ import taboolib.module.nms.MinecraftVersion
 import taboolib.module.nms.NMSItemTag
 import taboolib.module.nms.createDataSerializer
 import taboolib.module.nms.nmsClass
-import java.util.BitSet
+import java.util.*
 
 interface NMSPacket {
 
@@ -39,8 +37,8 @@ interface NMSPacket {
         }
     }
 
-    fun mathRot(yaw: Float): Float {
-        return yaw * 256.0f / 360.0f
+    fun mathRot(yaw: Float): Double {
+        return yaw * 256.0 / 360.0
     }
 
     fun unsupported(): Nothing {
@@ -69,8 +67,8 @@ interface NMSPacket {
             writeDouble(location.x)
             writeDouble(location.y)
             writeDouble(location.z)
-            writeFloat(mathRot(location.pitch))
-            writeFloat(mathRot(location.yaw))
+            writeFloat(mathRot(location.pitch).toFloat())
+            writeFloat(mathRot(location.yaw).toFloat())
             writeBoolean(onGround)
         }.build())
     }
@@ -221,10 +219,6 @@ interface NMSPacket {
     }
 
     fun createRegistryData(data: PacketData): Any {
-        unsupported()
-    }
-
-    fun createResetChat(data: PacketData): Any {
         unsupported()
     }
 
@@ -517,7 +511,7 @@ interface NMSPacket {
         return nmsClass("PacketPlayOutHeldItemSlot").invokeConstructor(slot)
     }
 
-    fun createLightUpdate(data: PacketData): Any{
+    fun createLightUpdate(data: PacketData): Any {
         val x = data.read<Int>("x")
         val z = data.read<Int>("z")
         val trustEdges = data.read<Boolean>("trustEdges")
@@ -545,18 +539,19 @@ interface NMSPacket {
             emptyBlockYMask.toLongArray().forEach(::writeLong)
             // skyUpdates
             writeVarInt(skyUpdates.size)
-            skyUpdates.forEach{  bytes ->
+            skyUpdates.forEach { bytes ->
                 writeVarInt(2048)
                 writeBytes(bytes)
             }
             // blockUpdates
             writeVarInt(blockUpdates.size)
-            blockUpdates.forEach{  bytes ->
+            blockUpdates.forEach { bytes ->
                 writeVarInt(2048)
                 writeBytes(bytes)
             }
         }.build())
     }
+
     fun createLogin(data: PacketData): Any
     fun createLookAt(data: PacketData): Any
     fun createMap(data: PacketData): Any
