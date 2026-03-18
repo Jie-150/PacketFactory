@@ -4,7 +4,7 @@ import org.bukkit.GameMode
 import taboolib.common.platform.function.pluginId
 import java.util.*
 
-class PlayerData(val uuid: UUID, val entityId: Int) {
+class PlayerData(val uuid: UUID) {
 
     var gamemode = GameMode.SURVIVAL
 

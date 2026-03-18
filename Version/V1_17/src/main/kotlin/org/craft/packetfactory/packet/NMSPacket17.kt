@@ -862,9 +862,18 @@ internal class NMSPacket17 : NMSPacket {
     }
 
     override fun createSpawnEntityPainting(data: PacketData): Any {
+        val entityId = data.read<Int>("entityId")
+        val uuid = data.read<UUID>("uuid")
+        val type = data.read<Art>("type")
         val location = data.read<Location>("location")
-        val direction = data.readEnumOrElse(EnumDirection::class.java, "direction", EnumDirection.WEST)
-        return PacketPlayOutSpawnEntityPainting(EntityPainting(null, location.toPosition(), EnumDirection.a(direction.name)))
+        val direction = data.read<Int>("direction")
+        return PacketPlayOutSpawnEntityPainting(createDataSerializer {
+            writeVarInt(entityId)
+            writeUUID(uuid)
+            writeVarInt(IRegistry.MOTIVE.getId(CraftArt.BukkitToNotch(type)))
+            writeBlockPosition(location.blockX, location.blockY, location.blockZ)
+            writeByte(direction.toByte())
+        }.build() as PacketDataSerializer)
     }
 
     private fun component(text: String): IChatBaseComponent {

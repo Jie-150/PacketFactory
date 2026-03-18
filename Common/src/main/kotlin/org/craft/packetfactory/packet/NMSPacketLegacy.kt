@@ -1,18 +1,22 @@
 package org.craft.packetfactory.packet
 
-import com.mojang.authlib.GameProfile
 import com.mojang.brigadier.suggestion.Suggestion
 import com.mojang.brigadier.suggestion.Suggestions
 import com.mojang.brigadier.tree.RootCommandNode
 import net.minecraft.server.v1_12_R1.ChatComponentText
 import net.minecraft.server.v1_16_R3.*
-import org.bukkit.Location
+import net.minecraft.server.v1_16_R3.PacketPlayOutPlayerInfo.EnumPlayerInfoAction.*
+import net.minecraft.server.v1_16_R3.SoundCategory
+import net.minecraft.server.v1_16_R3.World
+import net.minecraft.server.v1_16_R3.WorldBorder
+import org.bukkit.*
 import org.bukkit.Material
 import org.bukkit.Particle
-import org.bukkit.Sound
 import org.bukkit.attribute.Attribute
+import org.bukkit.block.BlockFace
 import org.bukkit.command.TabCompleter
 import org.bukkit.craftbukkit.libs.it.unimi.dsi.fastutil.shorts.ShortSets
+import org.bukkit.craftbukkit.v1_16_R3.CraftArt
 import org.bukkit.craftbukkit.v1_16_R3.CraftParticle
 import org.bukkit.craftbukkit.v1_16_R3.CraftSound
 import org.bukkit.craftbukkit.v1_16_R3.CraftWorld
@@ -20,6 +24,7 @@ import org.bukkit.craftbukkit.v1_16_R3.attribute.CraftAttributeMap
 import org.bukkit.craftbukkit.v1_16_R3.inventory.CraftItemStack
 import org.bukkit.craftbukkit.v1_16_R3.inventory.CraftMerchantRecipe
 import org.bukkit.craftbukkit.v1_16_R3.util.CraftChatMessage
+import org.bukkit.craftbukkit.v1_16_R3.util.CraftNamespacedKey
 import org.bukkit.entity.EntityType
 import org.bukkit.inventory.MerchantRecipe
 import org.bukkit.util.Vector
@@ -41,9 +46,46 @@ import java.util.*
 
 internal class NMSPacketLegacy : NMSPacket {
 
+    /** 1.12 及以下 PacketPlayOutSpawnEntity 使用的物体类型 ID */
+    private val objectTypeMap = mapOf(
+        EntityType.BOAT to 1,
+        EntityType.DROPPED_ITEM to 2,
+        EntityType.AREA_EFFECT_CLOUD to 3,
+        EntityType.MINECART to 10,
+        EntityType.PRIMED_TNT to 50,
+        EntityType.ENDER_CRYSTAL to 51,
+        EntityType.ARROW to 60,
+        EntityType.SNOWBALL to 61,
+        EntityType.EGG to 62,
+        EntityType.FIREBALL to 63,
+        EntityType.SMALL_FIREBALL to 64,
+        EntityType.ENDER_PEARL to 65,
+        EntityType.WITHER_SKULL to 66,
+        EntityType.SHULKER_BULLET to 67,
+        EntityType.LLAMA_SPIT to 68,
+        EntityType.FALLING_BLOCK to 70,
+        EntityType.ITEM_FRAME to 71,
+        EntityType.ENDER_SIGNAL to 72,
+        EntityType.SPLASH_POTION to 73,
+        EntityType.THROWN_EXP_BOTTLE to 75,
+        EntityType.FIREWORK to 76,
+        EntityType.LEASH_HITCH to 77,
+        EntityType.ARMOR_STAND to 78,
+        EntityType.EVOKER_FANGS to 79,
+        EntityType.FISHING_HOOK to 90,
+        EntityType.SPECTRAL_ARROW to 91,
+        EntityType.DRAGON_FIREBALL to 93,
+    )
+
     override fun createSpawnEntity(data: PacketData): Any {
         val entityType = data.read<EntityType>("entityType")
-        val entityTypeId = entityType.typeId.toByte()
+        val entityTypeId = try {
+            val registry = IRegistry.ENTITY_TYPE
+            registry.a(registry.get(CraftNamespacedKey.toMinecraft(entityType.key))).toByte()
+        } catch (_: NoSuchFieldError) {
+            // 1.12 及以下使用物体类型 ID，与 entityType.typeId 不同
+            (if (version >= 11300) objectTypeMap[entityType] ?: entityType.typeId else entityType.typeId).toByte()
+        }
         val entityId = data.read<Int>("entityId")
         val uuid = data.read<UUID>("uuid")
         val location = data.readOrElse("location", emptyLocation)
@@ -51,14 +93,14 @@ internal class NMSPacketLegacy : NMSPacket {
         val extraData = data.readOrElse("extraData", 0)
         return NMS16SpawnEntity().also {
             it.a(createDataSerializer {
-                writeInt(entityId)
+                writeVarInt(entityId)
                 writeUUID(uuid)
                 writeByte(entityTypeId)
                 writeDouble(location.x)
                 writeDouble(location.y)
                 writeDouble(location.z)
-                writeFloat(mathRot(location.pitch).toFloat())
-                writeFloat(yaw.toFloat())
+                writeByte(mathRot(location.pitch).toInt().toByte())
+                writeByte(yaw.toInt().toByte())
                 writeInt(extraData)
                 writeShort(0)
                 writeShort(0)
@@ -89,10 +131,10 @@ internal class NMSPacketLegacy : NMSPacket {
                 writeShort(0)
                 writeShort(0)
                 writeShort(0)
-                if (MinecraftVersion.versionId < 11600) {
-                    it.setProperty("n", listOf(DataWatcher(null)))
-                }
             }.build() as PacketDataSerializer)
+            if (MinecraftVersion.versionId < 11600) {
+                it.setProperty("n", listOf(DataWatcher(null)))
+            }
         }
 
     }
@@ -206,54 +248,94 @@ internal class NMSPacketLegacy : NMSPacket {
         val killer = data.readOrElse("killer", -1)
         val duration = data.readOrElse("duration", 0)
         return NMS16CombatEvent().also {
-            it.setProperty("a", PacketPlayOutCombatEvent.EnumCombatEventType.END_COMBAT)
-            it.setProperty("d", duration)
-            it.setProperty("c", killer)
+            it.a(createDataSerializer {
+                writeVarInt(PacketPlayOutCombatEvent.EnumCombatEventType.END_COMBAT.ordinal)
+                writeVarInt(duration)
+                writeInt(killer)
+            }.build() as PacketDataSerializer)
         }
     }
 
     override fun createPlayerCombatEnter(data: PacketData): Any {
         return NMS16CombatEvent().also {
-            it.setProperty("a", PacketPlayOutCombatEvent.EnumCombatEventType.ENTER_COMBAT)
+            it.a(createDataSerializer {
+                writeVarInt(PacketPlayOutCombatEvent.EnumCombatEventType.ENTER_COMBAT.ordinal)
+            }.build() as PacketDataSerializer)
         }
     }
 
     override fun createPlayerCombatKill(data: PacketData): Any {
         val playerId = data.read<Int>("playerId")
         val killer = data.readOrElse("killer", -1)
-        val text = component(data.read("text"))
+        val text = data.read<String>("text")
         return NMS16CombatEvent().also {
-            it.setProperty("a", PacketPlayOutCombatEvent.EnumCombatEventType.ENTITY_DIED)
-            it.setProperty("b", playerId)
-            it.setProperty("c", killer)
-            it.setProperty("e", text)
+            it.a(createDataSerializer {
+                writeVarInt(PacketPlayOutCombatEvent.EnumCombatEventType.ENTITY_DIED.ordinal)
+                writeVarInt(playerId)
+                writeInt(killer)
+                writeUtf(text)
+            }.build() as PacketDataSerializer)
         }
     }
 
     override fun createPlayerInfoRemove(data: PacketData): Any {
-        val players = data.read<List<GameProfile>>("players")
+        val players = data.read<List<PlayerData>>("players")
         return NMS16PlayerInfo().also {
-            it.setProperty("a", PacketPlayOutPlayerInfo.EnumPlayerInfoAction.REMOVE_PLAYER)
-            val b = players.map { p ->
-                it.PlayerInfoData(p, 0, EnumGamemode.SURVIVAL, null)
-            }
-            it.setProperty("b", b)
-
+            it.a(createDataSerializer {
+                writeVarInt(PacketPlayOutPlayerInfo.EnumPlayerInfoAction.REMOVE_PLAYER.ordinal)
+                writeVarInt(players.size)
+                players.forEach {
+                    writeUUID(it.uuid)
+                }
+            }.build() as PacketDataSerializer)
         }
     }
 
     override fun createPlayerInfoUpdate(data: PacketData): Any {
-        val type = data.readEnum(
-            PacketPlayOutPlayerInfo.EnumPlayerInfoAction::class.java,
-            "type",
-        )
-
+        val type = data.readEnum(PacketPlayOutPlayerInfo.EnumPlayerInfoAction::class.java, "type")
+        if (type == REMOVE_PLAYER) {
+            error("remove类型使用对应的方法")
+        }
+        val players = data.read<List<PlayerData>>("players")
         return NMS16PlayerInfo().also {
-            it.setProperty("a", type)
-            val b = data.read<List<PlayerData>>("players").map { p ->
-                it.PlayerInfoData(GameProfile(p.uuid, p.name), p.ping, EnumGamemode.SURVIVAL, null)
-            }
-            it.setProperty("b", b)
+            it.a(createDataSerializer {
+                writeVarInt(type.ordinal)
+                writeVarInt(players.size)
+                players.forEach {
+                    when (type) {
+                        ADD_PLAYER -> {
+                            writeUUID(it.uuid)
+                            writeUtf(it.name, 16)
+                            writeVarInt(it.properties.size)
+                            it.properties.forEach { property ->
+                                writeUtf(property.name)
+                                writeUtf(property.value)
+                                if (property.signature != null) writeUtf(property.signature!!)
+                            }
+                        }
+
+                        UPDATE_GAME_MODE -> {
+                            writeUUID(it.uuid)
+                            writeVarInt(it.gamemode.value)
+                        }
+
+                        UPDATE_LATENCY -> {
+                            writeUUID(it.uuid)
+                            writeVarInt(it.ping)
+                        }
+
+                        UPDATE_DISPLAY_NAME -> {
+                            writeUUID(it.uuid)
+                            writeBoolean(it.hasDisplayName())
+                            if (it.hasDisplayName()) {
+                                writeUtf(it.displayName!!)
+                            }
+                        }
+
+                        else -> {}
+                    }
+                }
+            }.build() as PacketDataSerializer)
         }
     }
 
@@ -271,21 +353,12 @@ internal class NMSPacketLegacy : NMSPacket {
         val size = data.read<Double>("size")
         val distance = data.readOrElse("distance", 10)
         val time = data.readOrElse("time", 0)
-        return NMS16WorldBorder().also {
-            it.setProperty("a", action)
-            it.setProperty("c", x * scale)
-            it.setProperty("d", z * scale)
-            // 这三个方法还不懂作用
-            // e -> LerpTarget
-            it.setProperty("e", 0)
-            // g -> LerpTime
-            it.setProperty("g", 0)
-            // b -> getAbsoluteMaxSize
-            it.setProperty("b", 0)
-            it.setProperty("f", size)
-            it.setProperty("i", distance)
-            it.setProperty("h", time)
-        }
+        val border = WorldBorder()
+        border.setCenter(x, z)
+        border.size = size
+        border.warningDistance = distance
+        border.warningTime = time
+        return NMS16WorldBorder(border, action)
     }
 
     override fun createSystemChat(data: PacketData): Any {
@@ -475,12 +548,7 @@ internal class NMSPacketLegacy : NMSPacket {
     override fun createLookAt(data: PacketData): Any {
         val anchor = data.readEnumOrElse(ArgumentAnchor.Anchor::class.java, "anchor", ArgumentAnchor.Anchor.EYES)
         val location = data.read<Location>("location")
-        return NMS16LookAt().also {
-            it.setProperty("e", anchor)
-            it.setProperty("a", location.x)
-            it.setProperty("b", location.y)
-            it.setProperty("c", location.z)
-        }
+        return NMS16LookAt(anchor, location.x, location.y, location.z)
     }
 
     override fun createMap(data: PacketData): Any {
@@ -600,8 +668,8 @@ internal class NMSPacketLegacy : NMSPacket {
         val header = component(data.readOrElse("header", ""))
         val footer = component(data.readOrElse("footer", ""))
         return NMS16PlayerListHeaderFooter().also {
-            it.setProperty("header", header)
-            it.setProperty("footer", footer)
+            it.footer = footer
+            it.header = header
         }
     }
 
@@ -879,34 +947,36 @@ internal class NMSPacketLegacy : NMSPacket {
         val location = data.readOrElse("location", emptyLocation)
         return NMS16NamedEntitySpawn().also {
             it.a(createDataSerializer {
-                writeInt(id)
+                writeVarInt(id)
                 writeUUID(uuid)
                 writeDouble(location.x)
                 writeDouble(location.y)
                 writeDouble(location.z)
-                writeFloat(mathRot(location.yaw).toFloat())
-                writeFloat(mathRot(location.pitch).toFloat())
+                writeByte(mathRot(location.yaw).toInt().toByte())
+                writeByte(mathRot(location.pitch).toInt().toByte())
+                writeMetadataLegacy(listOf())
             }.build() as PacketDataSerializer)
+            it.setProperty("h", DataWatcher(null))
         }
     }
 
     override fun createSpawnEntityPainting(data: PacketData): Any {
-        val type = data.read<String>("type")
+        val type = data.read<Art>("type")
         val entityId = data.read<Int>("entityId")
         val uuid = data.read<UUID>("uuid")
-        val direction = data.readEnumOrElse(EnumDirection::class.java, "direction", EnumDirection.NORTH)
+        val direction = EnumDirection.valueOf(data.read<BlockFace>("direction").name)
         val location = data.readOrElse("location", emptyLocation)
         return NMS16SpawnEntityPainting().also {
             it.a(createDataSerializer {
-                writeInt(entityId)
+                writeVarInt(entityId)
                 writeUUID(uuid)
-                try {
-                    writeInt(IRegistry.MOTIVE.a(Paintings::class.java.getField(type).get(null) as? Paintings))
-                } catch (_: NoSuchFieldError) {
-                    writeString(type)
+                if (version >= 11300) {
+                    writeVarInt(IRegistry.MOTIVE.a(CraftArt.BukkitToNotch(type)))
+                } else {
+                    writeUtf(type.name, 13)
                 }
                 writeBlockPosition(location.blockX, location.blockY, location.blockZ)
-                writeByte(direction.c().toByte())
+                writeByte(direction.get2DRotationValue().toByte())
             }.build() as PacketDataSerializer)
         }
     }

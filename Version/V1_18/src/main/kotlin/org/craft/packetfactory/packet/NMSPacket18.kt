@@ -1060,14 +1060,26 @@ internal class NMSPacket18 : NMSPacket {
      * 创建画实体生成网络数据包
      *
      * @param data 包含画实体生成信息的数据对象，需要包含以下字段：
+     *             - entityId: Int 实体ID（必需）
+     *             - uuid: UUID 实体UUID（必需）
+     *             - type: Art 画的类型（必需）
      *             - location: Location 画挂载的世界坐标（必需）
-     *             - direction: String 画面对的水平方向（必需）
+     *             - direction: Int 画面对的水平方向 0=SOUTH,1=WEST,2=NORTH,3=EAST（必需）
      * @return PacketPlayOutSpawnEntityPainting 画实体生成S2C数据包
      */
     override fun createSpawnEntityPainting(data: PacketData): Any {
+        val entityId = data.read<Int>("entityId")
+        val uuid = data.read<UUID>("uuid")
+        val type = data.read<Art>("type")
         val location = data.read<Location>("location")
-        val direction = data.readEnumOrElse(EnumDirection::class.java, "direction", EnumDirection.WEST)
-        return PacketPlayOutSpawnEntityPainting(EntityPainting(null, location.toPosition(), direction))
+        val direction = data.read<Int>("direction")
+        return PacketPlayOutSpawnEntityPainting(createDataSerializer {
+            writeVarInt(entityId)
+            writeUUID(uuid)
+            writeVarInt(IRegistry.MOTIVE.getId(CraftArt.BukkitToNotch(type)))
+            writeBlockPosition(location.blockX, location.blockY, location.blockZ)
+            writeByte(direction.toByte())
+        }.build() as PacketDataSerializer)
     }
 
     private fun toNMSItem(itemStack: org.bukkit.inventory.ItemStack): ItemStack {

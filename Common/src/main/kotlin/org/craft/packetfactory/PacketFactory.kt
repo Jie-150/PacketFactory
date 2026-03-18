@@ -19,14 +19,7 @@ object PacketFactory {
     }
 
     private val dataPacket by lazy {
-        val version = with(MinecraftVersion.versionId) {
-            when {
-                this >= 12105 -> "12105"
-                this >= 11700 -> "17000"
-                else -> "Legacy"
-            }
-        }
-        nmsProxy<DataWatcherItem>("{name}$version")
+        nmsProxy<DataWatcherItem>()
     }
 
     @JvmStatic
