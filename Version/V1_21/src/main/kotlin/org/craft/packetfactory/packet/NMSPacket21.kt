@@ -10,16 +10,43 @@ import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.core.registries.Registries
 import net.minecraft.nbt.MojangsonParser
 import net.minecraft.network.PacketDataSerializer
+import net.minecraft.network.chat.ChatClickable
 import net.minecraft.network.chat.IChatBaseComponent
 import net.minecraft.network.chat.numbers.BlankFormat
 import net.minecraft.network.protocol.common.ClientboundKeepAlivePacket
 import net.minecraft.network.protocol.common.ClientboundPingPacket
+import net.minecraft.network.protocol.common.ClientboundResourcePackPopPacket
+import net.minecraft.network.protocol.common.ClientboundResourcePackPushPacket
+import net.minecraft.network.protocol.common.ClientboundClearDialogPacket
+import net.minecraft.network.protocol.common.ClientboundShowDialogPacket
 import net.minecraft.network.protocol.game.*
 import net.minecraft.network.syncher.DataWatcher
 import net.minecraft.network.syncher.DataWatcherRegistry
 import net.minecraft.resources.MinecraftKey
 import net.minecraft.resources.ResourceKey
 import net.minecraft.server.bossevents.BossBattleCustom
+import net.minecraft.server.dialog.ActionButton
+import net.minecraft.server.dialog.CommonButtonData
+import net.minecraft.server.dialog.CommonDialogData
+import net.minecraft.server.dialog.ConfirmationDialog
+import net.minecraft.server.dialog.Dialog
+import net.minecraft.server.dialog.DialogAction
+import net.minecraft.server.dialog.MultiActionDialog
+import net.minecraft.server.dialog.NoticeDialog
+import net.minecraft.server.dialog.ServerLinksDialog
+import net.minecraft.server.dialog.action.Action
+import net.minecraft.server.dialog.action.CommandTemplate
+import net.minecraft.server.dialog.action.CustomAll
+import net.minecraft.server.dialog.action.ParsedTemplate
+import net.minecraft.server.dialog.action.StaticAction
+import net.minecraft.server.dialog.body.DialogBody
+import net.minecraft.server.dialog.body.ItemBody
+import net.minecraft.server.dialog.body.PlainMessage
+import net.minecraft.server.dialog.input.BooleanInput
+import net.minecraft.server.dialog.input.InputControl
+import net.minecraft.server.dialog.input.NumberRangeInput
+import net.minecraft.server.dialog.input.SingleOptionInput
+import net.minecraft.server.dialog.input.TextInput
 import net.minecraft.sounds.SoundCategory
 import net.minecraft.sounds.SoundEffect
 import net.minecraft.stats.Statistic
@@ -33,7 +60,6 @@ import net.minecraft.world.entity.ai.attributes.AttributeModifiable
 import net.minecraft.world.entity.player.PlayerAbilities
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.item.crafting.RecipePropertySet
-import net.minecraft.world.item.crafting.RecipeStonecutting
 import net.minecraft.world.item.crafting.SelectableRecipe
 import net.minecraft.world.item.trading.MerchantRecipeList
 import net.minecraft.world.level.ChunkCoordIntPair
@@ -48,15 +74,20 @@ import net.minecraft.world.scores.Scoreboard
 import net.minecraft.world.scores.ScoreboardObjective
 import net.minecraft.world.scores.ScoreboardTeam
 import net.minecraft.world.scores.criteria.IScoreboardCriteria
-import org.bukkit.*
+import org.bukkit.Location
+import org.bukkit.Material
+import org.bukkit.Particle
+import org.bukkit.Sound
+import org.bukkit.World
 import org.bukkit.block.Block
-import org.bukkit.craftbukkit.v1_21_R2.*
-import org.bukkit.craftbukkit.v1_21_R2.attribute.CraftAttribute
-import org.bukkit.craftbukkit.v1_21_R2.block.CraftBlock
-import org.bukkit.craftbukkit.v1_21_R2.inventory.CraftItemStack
-import org.bukkit.craftbukkit.v1_21_R2.inventory.CraftMerchantRecipe
-import org.bukkit.craftbukkit.v1_21_R2.map.CraftMapCursor
-import org.bukkit.craftbukkit.v1_21_R2.util.CraftNamespacedKey
+import org.bukkit.craftbukkit.v1_21_R5.*
+import org.bukkit.craftbukkit.v1_21_R5.attribute.CraftAttribute
+import org.bukkit.craftbukkit.v1_21_R5.block.CraftBlock
+import org.bukkit.craftbukkit.v1_21_R5.inventory.CraftItemStack
+import org.bukkit.craftbukkit.v1_21_R5.inventory.CraftMerchantRecipe
+import org.bukkit.craftbukkit.v1_21_R5.map.CraftMapCursor
+import org.bukkit.craftbukkit.v1_21_R5.util.CraftChatMessage
+import org.bukkit.craftbukkit.v1_21_R5.util.CraftNamespacedKey
 import org.bukkit.map.MapCursor
 import org.bukkit.util.Vector
 import org.craft.packetfactory.PacketFactory
@@ -64,6 +95,12 @@ import org.craft.packetfactory.data.Attribute
 import org.craft.packetfactory.data.MapData
 import org.craft.packetfactory.data.PacketData
 import org.craft.packetfactory.data.PlayerData
+import org.craft.packetfactory.packet.dialog.Body
+import org.craft.packetfactory.packet.dialog.DialogButton
+import org.craft.packetfactory.packet.dialog.DialogClickAction
+import org.craft.packetfactory.packet.dialog.DialogInput
+import org.craft.packetfactory.packet.dialog.DialogInputControl
+import org.craft.packetfactory.packet.dialog.DialogType
 import taboolib.common.platform.function.pluginId
 import taboolib.common.platform.function.warning
 import taboolib.library.reflex.Reflex.Companion.invokeConstructor
@@ -93,21 +130,15 @@ internal class NMSPacket21 : NMSPacket {
         val location = data.read<Location>("location")
         val extraData = data.readOrElse("extraData", 0)
         val yHeadRot = data.readOrElse("yHeadRot", 0.0)
-
-        val type = BuiltInRegistries.ENTITY_TYPE.byId(entityType.typeId.toInt())
+        val registry = BuiltInRegistries.ENTITY_TYPE
+        val type = try {
+            registry.get(CraftNamespacedKey.toMinecraft(entityType.key)).get().value()
+        } catch (_: NoSuchMethodError) {
+            registry.getOptional(CraftNamespacedKey.toMinecraft(entityType.key)).get()
+        }
 
         return PacketPlayOutSpawnEntity(
-            entityId,
-            uuid,
-            location.x,
-            location.y,
-            location.z,
-            fixYaw(entityType, location.yaw),
-            location.pitch,
-            type,
-            extraData,
-            Vec3D.ZERO,
-            yHeadRot
+            entityId, uuid, location.x, location.y, location.z, fixYaw(entityType, location.yaw), location.pitch, type, extraData, Vec3D.ZERO, yHeadRot
         )
     }
 
@@ -137,11 +168,16 @@ internal class NMSPacket21 : NMSPacket {
     }
 
     override fun createResourcePackPop(data: PacketData): Any {
-        TODO("Not yet implemented")
+        return ClientboundResourcePackPopPacket(Optional.of<UUID>(data.read("uuid")))
     }
 
     override fun createResourcePackPush(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val id = data.read<UUID>("uuid")
+        val url = data.read<String>("url")
+        val hash = data.read<String>("hash")
+        val required = data.read<Boolean>("required")
+        val prompt = Optional.of<IChatBaseComponent>(component(data.read("prompt")))
+        return ClientboundResourcePackPushPacket(id, url, hash, required, prompt)
     }
 
     override fun createServerLinks(data: PacketData): Any {
@@ -149,7 +185,13 @@ internal class NMSPacket21 : NMSPacket {
     }
 
     override fun createShowDialog(data: PacketData): Any {
-        TODO("Not yet implemented")
+        val dialog = data.read<DialogType>("dialog")
+        val nmsDialog = toNMSDialog(dialog)
+        return ClientboundShowDialogPacket(nmsDialog.direct())
+    }
+
+    override fun createClearDialog(data: PacketData): Any {
+        return ClientboundClearDialogPacket.INSTANCE
     }
 
     override fun createStoreCookie(data: PacketData): Any {
@@ -282,13 +324,11 @@ internal class NMSPacket21 : NMSPacket {
         val vector = data.readOrElse("vector", Vector())
         val onGround = data.readOrElse("onGround", false)
         return ClientboundEntityPositionSyncPacket(
-            entityId,
-            PositionMoveRotation(
+            entityId, PositionMoveRotation(
                 Vec3D(location.x, location.y, location.z),
                 Vec3D(vector.x, vector.y, vector.z),
                 mathRot(location.pitch).toFloat(), mathRot(location.yaw).toFloat(),
-            ),
-            onGround
+            ), onGround
         )
     }
 
@@ -355,7 +395,7 @@ internal class NMSPacket21 : NMSPacket {
         val gamemode = EnumGamemode.valueOf(playerData.gamemode.name)
         val displayName = if (playerData.hasDisplayName()) component(playerData.displayName!!) else null
         val entry = ClientboundPlayerInfoUpdatePacket.b(
-            playerData.uuid, profile, type != PlayerData.Type.REMOVE_PLAYER, playerData.ping, gamemode, displayName, 0, null
+            playerData.uuid, profile, type != PlayerData.Type.REMOVE_PLAYER, playerData.ping, gamemode, displayName, false, 0, null
         )
         return ClientboundPlayerInfoUpdatePacket::class.java.unsafeInstance().also {
             it.setProperty("actions", action)
@@ -622,10 +662,7 @@ internal class NMSPacket21 : NMSPacket {
         val vector = data.read<Vector>("vector")
         val soundEffect = CraftSound.bukkitToMinecraft(data.read("sound")).direct()
         return PacketPlayOutExplosion(
-            Vec3D(location.x, location.y, location.z),
-            Optional.of(Vec3D(vector.x, vector.y, vector.z)),
-            null,
-            soundEffect
+            Vec3D(location.x, location.y, location.z), Optional.of(Vec3D(vector.x, vector.y, vector.z)), null, soundEffect
         )
     }
 
@@ -651,11 +688,7 @@ internal class NMSPacket21 : NMSPacket {
         val locked = data.read<Boolean>("locked")
         val maps = data.read<List<MapData>>("maps").map {
             MapIcon(
-                CraftMapCursor.CraftType.bukkitToMinecraft(MapCursor.Type.valueOf(it.type)).direct(),
-                it.x,
-                it.z,
-                it.rotation,
-                Optional.of(component(it.name))
+                CraftMapCursor.CraftType.bukkitToMinecraft(MapCursor.Type.valueOf(it.type)).direct(), it.x, it.z, it.rotation, Optional.of(component(it.name))
             )
         }
         return PacketPlayOutMap(MapId(mapId), scale, locked, maps, null)
@@ -674,9 +707,7 @@ internal class NMSPacket21 : NMSPacket {
         val block = data.read<Block>("block") as CraftBlock
         val location = block.location.toPosition()
         return PacketPlayOutMultiBlockChange(
-            SectionPosition.of(location),
-            ShortSets.EMPTY_SET,
-            ChunkSection(CraftRegistry.getMinecraftRegistry(Registries.BIOME))
+            SectionPosition.of(location), ShortSets.EMPTY_SET, ChunkSection(CraftRegistry.getMinecraftRegistry(Registries.BIOME))
         )
     }
 
@@ -747,14 +778,9 @@ internal class NMSPacket21 : NMSPacket {
         }.toSet()
         val id = data.read<Int>("entityId")
         return PacketPlayOutPosition(
-            id,
-            PositionMoveRotation(
-                Vec3D(location.x, location.y, location.z),
-                Vec3D.ZERO,
-                mathRot(location.pitch).toFloat(),
-                mathRot(location.yaw).toFloat()
-            ),
-            teleportFlags
+            id, PositionMoveRotation(
+                Vec3D(location.x, location.y, location.z), Vec3D.ZERO, mathRot(location.pitch).toFloat(), mathRot(location.yaw).toFloat()
+            ), teleportFlags
         )
     }
 
@@ -784,8 +810,16 @@ internal class NMSPacket21 : NMSPacket {
         val flat = world.handle.isFlat
         return PacketPlayOutRespawn(
             CommonPlayerSpawnInfo(
-                world.handle.dimensionTypeRegistration(), type, world.seed, gamemode, previousGamemode, debug, flat,
-                Optional.of(GlobalPos(type, world.spawnLocation.toPosition())), 0, 0
+                world.handle.dimensionTypeRegistration(),
+                type,
+                world.seed,
+                gamemode,
+                previousGamemode,
+                debug,
+                flat,
+                Optional.of(GlobalPos(type, world.spawnLocation.toPosition())),
+                0,
+                0
             ), 3
         )
     }
@@ -797,13 +831,7 @@ internal class NMSPacket21 : NMSPacket {
         val displayName = data.read<String>("displayName")
         val healthDisplay = data.readEnum(IScoreboardCriteria.EnumScoreboardHealthDisplay::class.java, "healthDisplay")
         val objective = ScoreboardObjective(
-            Scoreboard(),
-            objectiveName,
-            IScoreboardCriteria.byName(criteria).get(),
-            component(displayName),
-            healthDisplay,
-            true,
-            BlankFormat()
+            Scoreboard(), objectiveName, IScoreboardCriteria.byName(criteria).get(), component(displayName), healthDisplay, true, BlankFormat()
         )
         return PacketPlayOutScoreboardDisplayObjective(DisplaySlot.entries[slot], objective)
     }
@@ -903,7 +931,7 @@ internal class NMSPacket21 : NMSPacket {
         val location = data.read<Location>("location").toPosition()
         val type = data.read<Int>("type")
         val nbt = data.read<ItemTagData>("nbt").toString()
-        val serializer = MojangsonParser.parseTag(nbt)
+        val serializer = MojangsonParser.parseCompoundFully(nbt)
         return PacketPlayOutTileEntityData::class.java.unsafeInstance().also {
             it.setProperty("pos", location)
             it.setProperty("type", type)
@@ -920,12 +948,9 @@ internal class NMSPacket21 : NMSPacket {
         val attributes = data.read<List<Attribute>>("attributes").map { a ->
             val attribute = CraftAttribute.bukkitToMinecraft(a.attribute)
             AttributeModifiable(attribute.direct()) {
-                val modifier =
-                    org.bukkit.attribute.AttributeModifier(
-                        attribute.descriptionId,
-                        attribute.defaultValue,
-                        org.bukkit.attribute.AttributeModifier.Operation.ADD_NUMBER
-                    )
+                val modifier = org.bukkit.attribute.AttributeModifier(
+                    attribute.descriptionId, attribute.defaultValue, org.bukkit.attribute.AttributeModifier.Operation.ADD_NUMBER
+                )
                 a.callback.accept(modifier)
                 warning("更新属性使用了回调函数,暂未实现修改")
             }.apply {
@@ -1060,7 +1085,7 @@ internal class NMSPacket21 : NMSPacket {
         val count = data.readOrElse("count", 1)
 
         return PacketPlayOutWorldParticles(
-            type, overrideLimiter, location.x, location.y, location.z, vector.x.toFloat(), vector.y.toFloat(), vector.z.toFloat(), maxSpeed, count
+            type, overrideLimiter, true, location.x, location.y, location.z, vector.x.toFloat(), vector.y.toFloat(), vector.z.toFloat(), maxSpeed, count
         )
     }
 
@@ -1078,7 +1103,7 @@ internal class NMSPacket21 : NMSPacket {
 
     fun component(text: String): IChatBaseComponent {
         return if (text.startsWith("{") && text.endsWith("}")) {
-            IChatBaseComponent.ChatSerializer.fromJson(text, IRegistryCustom.EMPTY)!!
+            CraftChatMessage.fromJSON(text)
         } else {
             IChatBaseComponent.literal(text)
         }
@@ -1086,5 +1111,120 @@ internal class NMSPacket21 : NMSPacket {
 
     fun <T> T.direct(): Holder<T> {
         return Holder.direct(this)
+    }
+
+    private fun toNMSDialog(dialog: DialogType): Dialog {
+        val common = toNMSCommon(dialog)
+        return when (dialog) {
+            is DialogType.Notice -> NoticeDialog(common, toNMSButton(dialog.action))
+            is DialogType.Confirmation -> ConfirmationDialog(common, toNMSButton(dialog.yesButton), toNMSButton(dialog.noButton))
+            is DialogType.MultiAction -> MultiActionDialog(
+                common,
+                dialog.actions.map { toNMSButton(it) },
+                dialog.exitAction?.let { Optional.of(toNMSButton(it)) } ?: Optional.empty(),
+                dialog.columns
+            )
+            is DialogType.ServerLinks -> ServerLinksDialog(
+                common,
+                dialog.exitAction?.let { Optional.of(toNMSButton(it)) } ?: Optional.empty(),
+                dialog.columns,
+                dialog.buttonWidth
+            )
+        }
+    }
+
+    private fun toNMSCommon(dialog: DialogType): CommonDialogData {
+        return CommonDialogData(
+            component(dialog.title),
+            dialog.externalTitle?.let { Optional.of(component(it)) } ?: Optional.empty(),
+            dialog.canCloseWithEscape,
+            dialog.pause,
+            DialogAction.valueOf(dialog.afterAction.name),
+            dialog.body.map { toNMSBody(it) },
+            dialog.inputs.map { toNMSInput(it) }
+        )
+    }
+
+    private fun toNMSBody(body: Body): DialogBody {
+        return when (body) {
+            is Body.Plain -> PlainMessage(component(body.content), body.width)
+            is Body.Item -> ItemBody(
+                toNMSItem(body.item),
+                body.description?.let { Optional.of(PlainMessage(component(it.content), it.width)) } ?: Optional.empty(),
+                body.showDecorations,
+                body.showTooltip,
+                body.width,
+                body.height
+            )
+        }
+    }
+
+    private fun toNMSInput(input: DialogInput): net.minecraft.server.dialog.Input {
+        return net.minecraft.server.dialog.Input(input.key, toNMSInputControl(input.control))
+    }
+
+    private fun toNMSInputControl(control: DialogInputControl): InputControl {
+        return when (control) {
+            is DialogInputControl.Text -> {
+                val multiline = control.multiline?.let {
+                    Optional.of<TextInput.a>(TextInput.a(
+                        it.maxLines?.let { v -> Optional.of(v) } ?: Optional.empty(),
+                        it.height?.let { v -> Optional.of(v) } ?: Optional.empty()
+                    ))
+                } ?: Optional.empty()
+                TextInput(control.width, component(control.label), control.labelVisible, control.initial, control.maxLength, multiline)
+            }
+            is DialogInputControl.Toggle -> BooleanInput(component(control.label), control.initial, control.onTrue, control.onFalse)
+            is DialogInputControl.NumberRange -> NumberRangeInput(
+                control.width,
+                component(control.label),
+                control.labelFormat,
+                NumberRangeInput.a(
+                    control.start,
+                    control.end,
+                    control.initial?.let { Optional.of(it) } ?: Optional.empty(),
+                    control.step?.let { Optional.of(it) } ?: Optional.empty()
+                )
+            )
+            is DialogInputControl.SingleOption -> SingleOptionInput(
+                control.width,
+                control.entries.map { entry ->
+                    SingleOptionInput.a(
+                        entry.id,
+                        entry.display?.let { Optional.of(component(it)) } ?: Optional.empty(),
+                        entry.initial
+                    )
+                },
+                component(control.label),
+                control.labelVisible
+            )
+        }
+    }
+
+    private fun toNMSButton(button: DialogButton): ActionButton {
+        val buttonData = CommonButtonData(
+            component(button.label),
+            button.tooltip?.let { Optional.of(component(it)) } ?: Optional.empty(),
+            button.width
+        )
+        val action = button.action?.let { Optional.of(toNMSClickAction(it)) } ?: Optional.empty()
+        return ActionButton(buttonData, action)
+    }
+
+    private fun toNMSClickAction(action: DialogClickAction): Action {
+        return when (action) {
+            is DialogClickAction.RunCommand -> StaticAction(ChatClickable.RunCommand(action.command))
+            is DialogClickAction.OpenUrl -> StaticAction(ChatClickable.OpenUrl(java.net.URI.create(action.url)))
+            is DialogClickAction.CopyToClipboard -> StaticAction(ChatClickable.CopyToClipboard(action.text))
+            is DialogClickAction.SuggestCommand -> StaticAction(ChatClickable.SuggestCommand(action.command))
+            is DialogClickAction.CommandTemplate -> {
+                val template = ParsedTemplate.CODEC.parse(
+                    com.mojang.serialization.JsonOps.INSTANCE,
+                    com.google.gson.JsonPrimitive(action.template)
+                ).result().orElseThrow { IllegalArgumentException("Invalid command template: ${action.template}") }
+                CommandTemplate(template)
+            }
+            is DialogClickAction.Custom -> CustomAll(MinecraftKey.read(action.id).result().get(), Optional.empty())
+        }
     }
 }

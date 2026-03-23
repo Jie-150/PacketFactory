@@ -178,6 +178,10 @@ interface NMSPacket {
         unsupported()
     }
 
+    fun createClearDialog(data: PacketData): Any {
+        unsupported()
+    }
+
     fun createStoreCookie(data: PacketData): Any {
         unsupported()
     }

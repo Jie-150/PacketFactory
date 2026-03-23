@@ -4,7 +4,8 @@ taboolib{
 
 dependencies {
     compileOnly(project(":Common"))
-    compileOnly("ink.ptms.core:v12104:12104:mapped")
+    compileOnly("ink.ptms.core:v12110:12110:mapped")
+    compileOnly("net.md-5:bungeecord-chat:1.21-R0.4")
     compileOnly("ink.ptms:nms-all:1.0.0")
 }
 

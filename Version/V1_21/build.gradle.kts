@@ -3,7 +3,7 @@ taboolib{
 }
 
 dependencies {
-    compileOnly("ink.ptms.core:v12103:12103:mapped")
+    compileOnly("ink.ptms.core:v12107:12107:mapped")
     compileOnly("com.mojang:authlib:7.1.61")
     compileOnly("io.netty:netty-all:4.1.86.Final")
     compileOnly("com.mojang:brigadier:1.0.500")
