@@ -326,8 +326,7 @@ internal class NMSPacketLegacy : NMSPacket {
 
                         UPDATE_DISPLAY_NAME -> {
                             writeUUID(it.uuid)
-                            writeBoolean(it.hasDisplayName())
-                            if (it.hasDisplayName()) {
+                            writeBoolean(it.hasDisplayName()) {
                                 writeUtf(it.displayName!!)
                             }
                         }
@@ -852,8 +851,10 @@ internal class NMSPacketLegacy : NMSPacket {
 
     override fun createUpdateAttributes(data: PacketData): Any {
         val entityId = data.read<Int>("entityId")
-        val attributes = data.read<List<Attribute>>("attributes").map {
-            AttributeModifiable(CraftAttributeMap.toMinecraft(it)) {}
+        val attributes = data.read<List<org.craft.packetfactory.data.Attribute>>("attributes").map {
+            AttributeModifiable(CraftAttributeMap.toMinecraft(it.attribute.get())) {}.apply {
+                value = it.base
+            }
         }
         return NMS16UpdateAttributes(entityId, attributes)
     }

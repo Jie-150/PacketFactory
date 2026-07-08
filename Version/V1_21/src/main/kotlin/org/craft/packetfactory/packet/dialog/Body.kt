@@ -4,9 +4,9 @@ import org.bukkit.inventory.ItemStack
 
 sealed interface Body {
 
-    data class Plain(val content: String, val width: Int = 200) : Body
+    class Plain(val content: String, val width: Int = 200) : Body
 
-    data class Item(
+    class Item(
         val item: ItemStack,
         val description: Plain? = null,
         val showDecorations: Boolean = true,

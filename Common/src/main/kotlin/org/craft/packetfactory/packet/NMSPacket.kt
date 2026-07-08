@@ -1,18 +1,28 @@
 package org.craft.packetfactory.packet
 
 import com.mojang.datafixers.util.Pair
+import com.sun.org.apache.xml.internal.security.c14n.implementations.UtfHelpper.writeByte
 import org.bukkit.Location
+import org.bukkit.Material
+import org.bukkit.craftbukkit.v1_16_R3.CraftEquipmentSlot
+import org.bukkit.craftbukkit.v1_16_R3.inventory.CraftEntityEquipment
 import org.bukkit.entity.EntityType
+import org.bukkit.inventory.EquipmentSlot
+import org.bukkit.inventory.ItemStack
 import org.bukkit.util.Vector
 import org.craft.packetfactory.data.PacketData
+import sun.security.jgss.GSSToken.writeInt
 import taboolib.common.UnsupportedVersionException
 import taboolib.library.reflex.Reflex.Companion.invokeConstructor
 import taboolib.library.reflex.Reflex.Companion.invokeMethod
+import taboolib.library.reflex.Reflex.Companion.unsafeInstance
 import taboolib.module.nms.MinecraftVersion
 import taboolib.module.nms.NMSItemTag
 import taboolib.module.nms.createDataSerializer
 import taboolib.module.nms.nmsClass
+import taboolib.module.nms.obcClass
 import java.util.*
+import kotlin.collections.map
 
 interface NMSPacket {
 
@@ -124,8 +134,18 @@ interface NMSPacket {
 
     fun createEntityEquipment(data: PacketData): Any {
         val entityId = data.read<Int>("entityId")
-        val equipments = data.read<Map<String, org.bukkit.inventory.ItemStack>>("equipments").map {
-            Pair(nmsClass("EnumItemSlot").invokeMethod<Any>("valueOf", it.key.uppercase(), isStatic = true), NMSItemTag.asNMSCopy(it.value))
+        val equipment = data.read<Map<EquipmentSlot, ItemStack?>>("equipments")
+        val craftSlot = obcClass("CraftEquipmentSlot").unsafeInstance()
+        if (version < 11600) {
+            val slot = equipment.entries.first()
+            return nmsClass("PacketPlayOutEntityEquipment").invokeConstructor(
+                entityId,
+                craftSlot.invokeMethod<Any>("getNMS", slot.key, isStatic = true),
+                NMSItemTag.asNMSCopy(slot.value ?: ItemStack(Material.AIR))
+            )
+        }
+        val equipments = equipment.mapNotNull {
+            Pair(craftSlot.invokeMethod<Any>("getNMS", it.key, isStatic = true), NMSItemTag.asNMSCopy(it.value?:ItemStack(Material.AIR)) )
         }
         return nmsClass("PacketPlayOutEntityEquipment").invokeConstructor(entityId, equipments)
     }

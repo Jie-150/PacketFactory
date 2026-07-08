@@ -3,7 +3,10 @@ package org.craft.packetfactory.packet
 import it.unimi.dsi.fastutil.objects.Object2IntMaps
 import it.unimi.dsi.fastutil.shorts.ShortSets
 import net.minecraft.commands.arguments.ArgumentAnchor
-import net.minecraft.core.*
+import net.minecraft.core.BlockPosition
+import net.minecraft.core.IRegistry
+import net.minecraft.core.NonNullList
+import net.minecraft.core.SectionPosition
 import net.minecraft.nbt.MojangsonParser
 import net.minecraft.network.PacketDataSerializer
 import net.minecraft.network.chat.ChatComponentText
@@ -22,7 +25,6 @@ import net.minecraft.world.EnumHand
 import net.minecraft.world.effect.MobEffect
 import net.minecraft.world.entity.EntityTypes
 import net.minecraft.world.entity.ai.attributes.AttributeModifiable
-import net.minecraft.world.entity.decoration.EntityPainting
 import net.minecraft.world.entity.player.PlayerAbilities
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.item.trading.MerchantRecipeList
@@ -36,6 +38,7 @@ import net.minecraft.world.scores.ScoreboardObjective
 import net.minecraft.world.scores.ScoreboardTeam
 import net.minecraft.world.scores.criteria.IScoreboardCriteria
 import org.bukkit.*
+import org.bukkit.attribute.AttributeModifier
 import org.bukkit.block.Block
 import org.bukkit.craftbukkit.v1_17_R1.*
 import org.bukkit.craftbukkit.v1_17_R1.attribute.CraftAttributeMap
@@ -84,16 +87,7 @@ internal class NMSPacket17 : NMSPacket {
         val extraData = data.readOrElse("extraData", 0)
         val type = IRegistry.ENTITY_TYPE.fromId(entityType.typeId.toInt())
         return PacketPlayOutSpawnEntity(
-            entityId,
-            uuid,
-            location.x,
-            location.y,
-            location.z,
-            mathRot(location.yaw).toFloat(),
-            mathRot(location.pitch).toFloat(),
-            type,
-            extraData,
-            Vec3D.ZERO
+            entityId, uuid, location.x, location.y, location.z, mathRot(location.yaw).toFloat(), mathRot(location.pitch).toFloat(), type, extraData, Vec3D.ZERO
         )
     }
 
@@ -208,14 +202,12 @@ internal class NMSPacket17 : NMSPacket {
                         playerData.properties.forEach { p ->
                             writeUtf(p.name)
                             writeUtf(p.value)
-                            writeBoolean(p.hasSignature())
-                            if (p.hasSignature()) {
+                            writeBoolean(p.hasSignature()) {
                                 writeUtf(p.signature!!)
                             }
                         }
                         writeVarInt(playerData.gamemode.value)
-                        writeBoolean(playerData.hasDisplayName())
-                        if (playerData.hasDisplayName()) {
+                        writeBoolean(playerData.hasDisplayName()) {
                             writeString(playerData.displayName!!)
                         }
                     }
@@ -232,8 +224,7 @@ internal class NMSPacket17 : NMSPacket {
 
                     PlayerData.Type.UPDATE_DISPLAY_NAME -> {
                         writeUUID(playerData.uuid)
-                        writeBoolean(playerData.hasDisplayName())
-                        if (playerData.hasDisplayName()) {
+                        writeBoolean(playerData.hasDisplayName()) {
                             writeUtf(playerData.displayName!!)
                         }
                     }
@@ -347,9 +338,9 @@ internal class NMSPacket17 : NMSPacket {
     }
 
     override fun createBlockChange(data: PacketData): Any {
-        val block =data.read<Block>("block") as CraftBlock
+        val block = data.read<Block>("block") as CraftBlock
         val location = block.location.toPosition()
-        return PacketPlayOutMultiBlockChange(SectionPosition.a(location), ShortSets.EMPTY_SET, ChunkSection(0),false)
+        return PacketPlayOutMultiBlockChange(SectionPosition.a(location), ShortSets.EMPTY_SET, ChunkSection(0), false)
     }
 
     override fun createBossBar(data: PacketData): Any {
@@ -561,8 +552,7 @@ internal class NMSPacket17 : NMSPacket {
         val id = data.read<Int>("entityId")
         val dismountVehicle = data.readOrElse("dismountVehicle", false)
         return PacketPlayOutPosition(
-            location.x, location.y, location.z, mathRot(location.pitch).toFloat(),
-            mathRot(location.yaw).toFloat(), teleportFlags, id, dismountVehicle
+            location.x, location.y, location.z, mathRot(location.pitch).toFloat(), mathRot(location.yaw).toFloat(), teleportFlags, id, dismountVehicle
         )
     }
 
@@ -712,14 +702,9 @@ internal class NMSPacket17 : NMSPacket {
     override fun createUpdateAttributes(data: PacketData): Any {
         val entityId = data.read<Int>("entityId")
         val attributes = data.read<List<Attribute>>("attributes").map { a ->
-            val attribute = CraftAttributeMap.toMinecraft(a.attribute)
+            val attribute = CraftAttributeMap.toMinecraft(a.attribute.get())
             AttributeModifiable(attribute) {
-                val modifier =
-                    org.bukkit.attribute.AttributeModifier(
-                        attribute.name,
-                        attribute.default,
-                        org.bukkit.attribute.AttributeModifier.Operation.ADD_NUMBER
-                    )
+                val modifier = AttributeModifier(a.attribute.name(), attribute.default, a.operation)
                 a.callback.accept(modifier)
                 warning("更新属性使用了回调函数,暂未实现修改")
             }.apply {
@@ -879,10 +864,7 @@ internal class NMSPacket17 : NMSPacket {
     private fun component(text: String): IChatBaseComponent {
         return if (text.startsWith("{") && text.endsWith("}")) {
             if (require(IChatBaseComponent.ChatSerializer::class.java)) {
-                listOf(
-                    { CraftChatMessage.fromJSON(text) },
-                    { IChatBaseComponent.ChatSerializer.a(text) }
-                ).firstNotNullOf { runCatching(it).getOrNull() }
+                listOf({ CraftChatMessage.fromJSON(text) }, { IChatBaseComponent.ChatSerializer.a(text) }).firstNotNullOf { runCatching(it).getOrNull() }
             } else {
                 CraftChatMessage.fromJSON(text)
             }

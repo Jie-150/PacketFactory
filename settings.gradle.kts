@@ -9,5 +9,6 @@ include(
     "Version:V1_21",
     "Plugin",
     "Other",
-    "Other:DataWatcher",
+    "Other:DataWatcherLegacy",
+    "Other:DataWatcher12111",
 )

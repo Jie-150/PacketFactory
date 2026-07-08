@@ -19,7 +19,7 @@ object PacketFactory {
     }
 
     private val dataPacket by lazy {
-        nmsProxy<DataWatcherItem>()
+        nmsProxy<DataWatcherItem>("{name}${if (MinecraftVersion.versionId >= 12111) 12111 else "Impl"}")
     }
 
     @JvmStatic

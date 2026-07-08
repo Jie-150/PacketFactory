@@ -1,6 +1,10 @@
+import io.izzel.taboolib.gradle.Bukkit
 import io.izzel.taboolib.gradle.BukkitNMSDataSerializer
+import io.izzel.taboolib.gradle.BukkitNMSItemTag
 import io.izzel.taboolib.gradle.BukkitNMSUtil
+import io.izzel.taboolib.gradle.BukkitUtil
 import io.izzel.taboolib.gradle.TabooLibExtension
+import io.izzel.taboolib.gradle.XSeries
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
@@ -18,9 +22,9 @@ subprojects {
     configure<TabooLibExtension> {
         subproject = true
         env {
-            install(BukkitNMSUtil, BukkitNMSDataSerializer)
+            install(BukkitNMSUtil,BukkitNMSItemTag, BukkitNMSDataSerializer, Bukkit)
         }
-        version { taboolib = "6.2.4-a3e8abb" }
+        version { taboolib = "6.3.0-716e043" }
     }
     repositories {
         mavenLocal()

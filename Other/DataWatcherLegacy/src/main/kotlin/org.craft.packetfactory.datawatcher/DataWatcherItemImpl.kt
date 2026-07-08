@@ -212,7 +212,6 @@ internal class DataWatcherItemImpl : DataWatcherItem {
         registerVariant()
     }
 
-
     fun Location.toPosition(): BlockPosition {
         return BlockPosition(blockX, blockY, blockZ)
     }

@@ -303,14 +303,12 @@ internal class NMSPacket18 : NMSPacket {
                         playerData.properties.forEach { p ->
                             writeUtf(p.name)
                             writeUtf(p.value)
-                            writeBoolean(p.hasSignature())
-                            if (p.hasSignature()) {
+                            writeBoolean(p.hasSignature()) {
                                 writeUtf(p.signature!!)
                             }
                         }
                         writeVarInt(playerData.gamemode.value)
-                        writeBoolean(playerData.hasDisplayName())
-                        if (playerData.hasDisplayName()) {
+                        writeBoolean(playerData.hasDisplayName()){
                             writeString(playerData.displayName!!)
                         }
                     }
@@ -327,8 +325,7 @@ internal class NMSPacket18 : NMSPacket {
 
                     PlayerData.Type.UPDATE_DISPLAY_NAME -> {
                         writeUUID(playerData.uuid)
-                        writeBoolean(playerData.hasDisplayName())
-                        if (playerData.hasDisplayName()) {
+                        writeBoolean(playerData.hasDisplayName()){
                             writeUtf(playerData.displayName!!)
                         }
                     }
@@ -875,12 +872,12 @@ internal class NMSPacket18 : NMSPacket {
     override fun createUpdateAttributes(data: PacketData): Any {
         val entityId = data.read<Int>("entityId")
         val attributes = data.read<List<Attribute>>("attributes").map { a ->
-            val attribute = CraftAttributeMap.toMinecraft(a.attribute)
+            val attribute = CraftAttributeMap.toMinecraft(a.attribute.get())
             AttributeModifiable(attribute) {
                 val modifier = org.bukkit.attribute.AttributeModifier(
                     attribute.descriptionId,
                     attribute.defaultValue,
-                    org.bukkit.attribute.AttributeModifier.Operation.ADD_NUMBER
+                    a.operation
                 )
                 a.callback.accept(modifier)
                 warning("更新属性使用了回调函数,暂未实现修改")

@@ -946,10 +946,10 @@ internal class NMSPacket21 : NMSPacket {
     override fun createUpdateAttributes(data: PacketData): Any {
         val entityId = data.read<Int>("entityId")
         val attributes = data.read<List<Attribute>>("attributes").map { a ->
-            val attribute = CraftAttribute.bukkitToMinecraft(a.attribute)
+            val attribute = CraftAttribute.bukkitToMinecraft(a.attribute.get())
             AttributeModifiable(attribute.direct()) {
                 val modifier = org.bukkit.attribute.AttributeModifier(
-                    attribute.descriptionId, attribute.defaultValue, org.bukkit.attribute.AttributeModifier.Operation.ADD_NUMBER
+                    attribute.descriptionId, attribute.defaultValue, a.operation
                 )
                 a.callback.accept(modifier)
                 warning("更新属性使用了回调函数,暂未实现修改")
@@ -1124,6 +1124,7 @@ internal class NMSPacket21 : NMSPacket {
                 dialog.exitAction?.let { Optional.of(toNMSButton(it)) } ?: Optional.empty(),
                 dialog.columns
             )
+
             is DialogType.ServerLinks -> ServerLinksDialog(
                 common,
                 dialog.exitAction?.let { Optional.of(toNMSButton(it)) } ?: Optional.empty(),
@@ -1167,13 +1168,15 @@ internal class NMSPacket21 : NMSPacket {
         return when (control) {
             is DialogInputControl.Text -> {
                 val multiline = control.multiline?.let {
-                    Optional.of<TextInput.a>(TextInput.a(
+                    Optional.of<TextInput.a>(
+                        TextInput.a(
                         it.maxLines?.let { v -> Optional.of(v) } ?: Optional.empty(),
                         it.height?.let { v -> Optional.of(v) } ?: Optional.empty()
                     ))
                 } ?: Optional.empty()
                 TextInput(control.width, component(control.label), control.labelVisible, control.initial, control.maxLength, multiline)
             }
+
             is DialogInputControl.Toggle -> BooleanInput(component(control.label), control.initial, control.onTrue, control.onFalse)
             is DialogInputControl.NumberRange -> NumberRangeInput(
                 control.width,
@@ -1186,6 +1189,7 @@ internal class NMSPacket21 : NMSPacket {
                     control.step?.let { Optional.of(it) } ?: Optional.empty()
                 )
             )
+
             is DialogInputControl.SingleOption -> SingleOptionInput(
                 control.width,
                 control.entries.map { entry ->
@@ -1224,6 +1228,7 @@ internal class NMSPacket21 : NMSPacket {
                 ).result().orElseThrow { IllegalArgumentException("Invalid command template: ${action.template}") }
                 CommandTemplate(template)
             }
+
             is DialogClickAction.Custom -> CustomAll(MinecraftKey.read(action.id).result().get(), Optional.empty())
         }
     }
